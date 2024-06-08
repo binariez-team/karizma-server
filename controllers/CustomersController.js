@@ -64,7 +64,7 @@ exports.deleteCustomer = async (req, res, next) => {
 //customer model related to user//
 // get customers by user id
 exports.getCustomersByUserId = async (req, res, next) => {
-  const user_id = req.params.user_id;
+  const user_id = req.user.user_id;
   try {
     const customers = await Customer.getCustomersByUserId(user_id);
     res.status(200).json(customers);
@@ -75,13 +75,61 @@ exports.getCustomersByUserId = async (req, res, next) => {
 
 //get a customer by id and user id
 exports.getCustomerByIdAndUserId = async (req, res, next) => {
-  const { user_id, account_id } = req.params;
+  const user_id = req.user.user_id;
+  const { account_id } = req.params;
   try {
     const customer = await Customer.getCustomerByIdAndUserId(
       user_id,
       account_id
     );
     res.status(200).json(customer);
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.createUserCustomer = async (req, res, next) => {
+  const user_id = req.user.user_id;
+  const data = req.body;
+  try {
+    const { insertId } = await Customer.createCustomerByUserId(user_id, data);
+    const customer = await Customer.getCustomerByIdAndUserId(user_id, insertId);
+    res
+      .status(201)
+      .json({ message: "Customer created successfully", customer });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.updateUserCustomer = async (req, res, next) => {
+  const user_id = req.user.user_id;
+  const { account_id } = req.params;
+  const data = req.body;
+  try {
+    const result = await Customer.updateCustomerByUserId(
+      user_id,
+      account_id,
+      data
+    );
+    const customer = await Customer.getCustomerByIdAndUserId(
+      user_id,
+      account_id
+    );
+    res
+      .status(201)
+      .json({ message: "Customer updated successfully", customer });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.deleteUserCustomer = async (req, res, next) => {
+  const user_id = req.user.user_id;
+  const { account_id } = req.params;
+  try {
+    const result = await Customer.deleteCustomerByUserId(user_id, account_id);
+    res.status(201).json({ message: "Customer deleted successfully" });
   } catch (error) {
     next(error);
   }

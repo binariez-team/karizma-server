@@ -17,7 +17,7 @@ app.use("/api/auth", AuthRoutes);
 
 //admin routes
 app.use("/api/users", admin, UsersRoutes);
-app.use("/api/customers", CustomersRoutes);
+app.use("/api/customers", auth, CustomersRoutes);
 app.use("/api/suppliers", admin, SuppliersRoutes);
 
 // handle errors

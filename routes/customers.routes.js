@@ -1,14 +1,21 @@
 const express = require("express");
 const router = express.Router();
-const { auth, admin } = require("../middleware/auth");
+const { admin } = require("../middleware/auth");
 
 const CustomersController = require("../controllers/CustomersController");
 
-router.get("/user/:user_id", auth, CustomersController.getCustomersByUserId);
+router.get("/user", CustomersController.getCustomersByUserId);
 router.get(
-  "/user/:user_id/:account_id",
-  auth,
+  "/user/:account_id",
+
   CustomersController.getCustomerByIdAndUserId
+);
+router.post("/user", CustomersController.createUserCustomer);
+router.put("/user/:account_id", CustomersController.updateUserCustomer);
+router.delete(
+  "/user/:account_id",
+
+  CustomersController.deleteUserCustomer
 );
 
 //admin routes
