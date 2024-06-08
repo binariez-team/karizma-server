@@ -59,7 +59,7 @@ class User {
 
   // create user
   static async create(user) {
-    user.password = bcrypt.hashSync(password, 10);
+    user.password = bcrypt.hashSync(user.password, 10);
     const [rows] = await pool.query(`INSERT INTO users SET ?`, user);
     return rows;
   }
