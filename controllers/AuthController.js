@@ -21,6 +21,7 @@ exports.login = async (req, res, next) => {
 
       const user = {
         username: username,
+        user_type: results.user_type,
         token: token,
       };
       res.status(200).send(user);
