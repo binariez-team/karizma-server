@@ -1,6 +1,6 @@
 const app = require("./app");
 const cors = require("cors");
-const auth = require("./middleware/auth");
+const { auth, admin } = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");
 
 //import routes
@@ -12,7 +12,7 @@ app.use(cors({ origin: "*" }));
 
 // routes
 app.use("/api/auth", AuthRoutes);
-app.use("/api/users", auth, UsersRoutes);
+app.use("/api/users", admin, UsersRoutes);
 
 // handle errors
 app.use(errorHandler);

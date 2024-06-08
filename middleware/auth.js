@@ -19,4 +19,15 @@ const verifyToken = (req, res, next) => {
   return next();
 };
 
-module.exports = verifyToken;
+const verifyAdmin = (req, res, next) => {
+  verifyToken(req, res, () => {
+    const user = req.user;
+    if (user.user_type !== "admin") {
+      return res.status(403).send("No enough permissions to access");
+    }
+    return next();
+  });
+};
+
+exports.auth = verifyToken;
+exports.admin = verifyAdmin;

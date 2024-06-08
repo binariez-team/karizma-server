@@ -14,6 +14,7 @@ exports.login = async (req, res, next) => {
         {
           user_id: results.user_id.toString(),
           username,
+          user_type: results.user_type,
         },
         "$3a#_cJDUV-$QsRewWXcyH-Xdji8#%^$*(_ZkfNdI@#!D-Nv0E_M3a"
       );
