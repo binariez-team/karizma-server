@@ -18,6 +18,11 @@ router.delete(
   CustomersController.deleteUserCustomer
 );
 
+router.get(
+  "/user/transactions/:account_id&:start&:end",
+  CustomersController.getCustomerBalance
+);
+
 //admin routes
 router.use(admin);
 

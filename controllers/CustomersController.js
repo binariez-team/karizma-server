@@ -1,4 +1,5 @@
 const Customer = require("../models/CustomersModel");
+const Accounts = require("../models/AccountsModel");
 
 // get customers
 exports.getAllCustomers = async (req, res, next) => {
@@ -130,6 +131,22 @@ exports.deleteUserCustomer = async (req, res, next) => {
   try {
     const result = await Customer.deleteCustomerByUserId(user_id, account_id);
     res.status(201).json({ message: "Customer deleted successfully" });
+  } catch (error) {
+    next(error);
+  }
+};
+
+exports.getCustomerBalance = async (req, res, next) => {
+  const user_id = req.user.user_id;
+  const { account_id, start, end } = req.params;
+  try {
+    const balance = await Accounts.getAccountDetailsById(
+      user_id,
+      account_id,
+      start,
+      end
+    );
+    res.status(200).json(balance);
   } catch (error) {
     next(error);
   }
