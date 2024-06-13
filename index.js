@@ -20,6 +20,12 @@ app.use("/api/users", admin, UsersRoutes);
 app.use("/api/customers", auth, CustomersRoutes);
 app.use("/api/suppliers", admin, SuppliersRoutes);
 
+app.get("/", (req, res) => {
+	res.json({
+		message: "API is online",
+	});
+});
+
 // handle errors
 app.use(errorHandler);
 module.exports = app;

@@ -2,10 +2,10 @@ const mysql = require("mysql2/promise");
 
 var pool = mysql.createPool({
 	connectionLimit: 10,
-	host: "localhost",
-	user: "root",
-	password: "roottoor", // ,Yqv(j93q]4w (online pass)
-	database: "karizma",
+	host: "209.172.2.50",
+	user: "karizmam_app",
+	password: ",Yqv(j93q]4w", // ,Yqv(j93q]4w (online pass)
+	database: "karizmam_karizma",
 	multipleStatements: true,
 	dateStrings: true,
 });
