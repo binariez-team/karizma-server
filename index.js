@@ -1,5 +1,6 @@
 const app = require("./app");
 const cors = require("cors");
+const path = require("path");
 const { auth, admin } = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -24,9 +25,7 @@ app.use("/api/users", admin, UsersRoutes);
 app.use("/api/suppliers", admin, SuppliersRoutes);
 
 app.get("/", (req, res) => {
-	res.json({
-		message: "API is online",
-	});
+	res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // handle errors
