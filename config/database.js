@@ -1,11 +1,21 @@
 const mysql = require("mysql2/promise");
 
+// var pool = mysql.createPool({
+// 	connectionLimit: 10,
+// 	host: "209.172.2.50",
+// 	user: "karizmam_app",
+// 	password: ",Yqv(j93q]4w",
+// 	database: "karizmam_karizma",
+// 	multipleStatements: true,
+// 	dateStrings: true,
+// });
+
 var pool = mysql.createPool({
 	connectionLimit: 10,
-	host: "209.172.2.50",
-	user: "karizmam_app",
-	password: ",Yqv(j93q]4w", // ,Yqv(j93q]4w (online pass)
-	database: "karizmam_karizma",
+	host: "localhost",
+	user: "root",
+	password: "roottoor",
+	database: "karizma",
 	multipleStatements: true,
 	dateStrings: true,
 });

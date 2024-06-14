@@ -8,6 +8,7 @@ const AuthRoutes = require("./routes/auth.routes");
 const UsersRoutes = require("./routes/users.routes");
 const CustomersRoutes = require("./routes/customers.routes");
 const SuppliersRoutes = require("./routes/suppliers.routes");
+const AdminStockRoutes = require("./routes/admin-stock.routes");
 
 // allow Cross-Origin calls to this app
 app.use(cors({ origin: "*" }));
@@ -15,9 +16,11 @@ app.use(cors({ origin: "*" }));
 // routes
 app.use("/api/auth", AuthRoutes);
 
-//admin routes
-app.use("/api/users", admin, UsersRoutes);
 app.use("/api/customers", auth, CustomersRoutes);
+
+//admin routes
+app.use("/api/admin-stock", admin, AdminStockRoutes);
+app.use("/api/users", admin, UsersRoutes);
 app.use("/api/suppliers", admin, SuppliersRoutes);
 
 app.get("/", (req, res) => {
