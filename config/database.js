@@ -1,12 +1,21 @@
 const mysql = require("mysql2/promise");
 
 if (process.env.NODE_ENV === "production") {
+	// var pool = mysql.createPool({
+	// 	connectionLimit: 10,
+	// 	host: "209.172.2.50",
+	// 	user: "karizmam_app",
+	// 	password: ",Yqv(j93q]4w",
+	// 	database: "karizmam_karizma",
+	// 	multipleStatements: true,
+	// 	dateStrings: true,
+	// });
 	var pool = mysql.createPool({
 		connectionLimit: 10,
-		host: "209.172.2.50",
-		user: "karizmam_app",
-		password: ",Yqv(j93q]4w",
-		database: "karizmam_karizma",
+		host: "shareddb-l.hosting.stackcp.net",
+		user: "karizma-3939006b",
+		password: "ctip1o1ogi",
+		database: "karizma-3939006b",
 		multipleStatements: true,
 		dateStrings: true,
 	});
