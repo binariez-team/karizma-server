@@ -25,9 +25,8 @@ exports.updateProduct = async (req, res, next) => {
 	let product = req.body;
 	try {
 		await Product.update(product);
-		res.status(201).json({
-			message: "Product has been updated successfully!",
-		});
+		let [updatedProduct] = await Product.getById(product.product_id);
+		res.status(201).send(updatedProduct);
 	} catch (error) {
 		next(error);
 	}
