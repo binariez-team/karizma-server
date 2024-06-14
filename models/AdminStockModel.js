@@ -81,12 +81,6 @@ class Product {
 				[product, product.product_id]
 			);
 
-			// update inventory table for supplier change
-			await connection.query(
-				`UPDATE inventory SET supplier_id_fk = ? WHERE product_id_fk = ?`,
-				[supplier_id, product.product_id]
-			);
-
 			// commit transaction
 			await connection.commit();
 		} catch (error) {
