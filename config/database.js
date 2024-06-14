@@ -12,7 +12,8 @@ if (process.env.NODE_ENV === "production") {
 	// });
 	var pool = mysql.createPool({
 		connectionLimit: 10,
-		host: "mysql.gb.stackcp.com:61858",
+		host: "mysql.gb.stackcp.com",
+		port: 61858,
 		user: "karizma-3939006b",
 		password: "ctip1o1ogi",
 		database: "karizma-3939006b",
