@@ -69,7 +69,7 @@ class Product {
 	}
 
 	// update existing product
-	static async update(product, supplier_id) {
+	static async update(product) {
 		const connection = await pool.getConnection();
 		try {
 			// begin transaction
@@ -101,12 +101,6 @@ class Product {
 			// delete from product table
 			await connection.query(
 				`UPDATE products SET is_deleted = 1 WHERE product_id = ?`,
-				id
-			);
-
-			// delete from inventory table
-			await connection.query(
-				`UPDATE inventory SET is_deleted = 1 WHERE product_id_fk = ?`,
 				id
 			);
 
