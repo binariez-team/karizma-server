@@ -10,10 +10,11 @@ exports.getAllProducts = async (req, res, next) => {
 };
 
 exports.createProduct = async (req, res, next) => {
-	let product = req.body;
-	delete product.product_id;
+	let data = req.body;
+	let user = req.user;
+	delete data.product_id;
 	try {
-		let result = await Product.create(product);
+		let result = await Product.create(data, user);
 		let [createdProduct] = await Product.getById(result.insertId);
 		res.status(201).send(createdProduct);
 	} catch (error) {
@@ -23,8 +24,9 @@ exports.createProduct = async (req, res, next) => {
 
 exports.updateProduct = async (req, res, next) => {
 	let product = req.body;
+	let user = req.user;
 	try {
-		await Product.update(product);
+		await Product.update(product, user);
 		let [updatedProduct] = await Product.getById(product.product_id);
 		res.status(201).send(updatedProduct);
 	} catch (error) {
