@@ -23,7 +23,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 pool.on("connection", (connection) => {
-	connection.query("SET time_zone = '+02:00'", (err) => {
+	connection.query("SET time_zone = 'Asia/Beirut'", (err) => {
 		if (err) {
 			console.error("Error setting timezone:", err);
 		} else {
