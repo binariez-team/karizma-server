@@ -10,6 +10,15 @@ if (process.env.NODE_ENV === "production") {
 		multipleStatements: true,
 		dateStrings: true,
 	});
+	pool.on("connection", (connection) => {
+		connection.query("SET time_zone = '+03:00'", (err) => {
+			if (err) {
+				console.error("Error setting timezone:", err);
+			} else {
+				console.log("Timezone set to +03:00 successfully");
+			}
+		});
+	});
 } else {
 	var pool = mysql.createPool({
 		connectionLimit: 10,
@@ -21,16 +30,6 @@ if (process.env.NODE_ENV === "production") {
 		dateStrings: true,
 	});
 }
-
-pool.on("connection", (connection) => {
-	connection.query("SET time_zone = 'Asia/Beirut'", (err) => {
-		if (err) {
-			console.error("Error setting timezone:", err);
-		} else {
-			console.log("Timezone set to Asia/Beirut successfully");
-		}
-	});
-});
 
 pool.getConnection(async (err, connection) => {
 	if (err) {
