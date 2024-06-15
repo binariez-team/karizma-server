@@ -22,6 +22,16 @@ if (process.env.NODE_ENV === "production") {
 	});
 }
 
+pool.on("connection", (connection) => {
+	connection.query("SET time_zone = '+02:00'", (err) => {
+		if (err) {
+			console.error("Error setting timezone:", err);
+		} else {
+			console.log("Timezone set to Asia/Beirut successfully");
+		}
+	});
+});
+
 pool.getConnection(async (err, connection) => {
 	if (err) {
 		if (err.code === "PROTOCOL_CONNECTION_LOST") {
