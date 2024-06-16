@@ -2,6 +2,7 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel");
 
 exports.login = async (req, res, next) => {
+	const io = req.io;
 	try {
 		const { username, password } = req.body;
 
@@ -24,6 +25,7 @@ exports.login = async (req, res, next) => {
 				user_type: results.user_type,
 				token: token,
 			};
+			io.emit("userLoggedIn", username);
 			res.status(200).send(user);
 		} else {
 			res.status(401).send("Incorrect username or password!");

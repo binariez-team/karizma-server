@@ -1,5 +1,30 @@
-const app = require("./app");
+require("dotenv").config();
+const express = require("express");
+const app = express();
+app.use(express.json());
+
 const cors = require("cors");
+// allow Cross-Origin calls to this app
+app.use(cors());
+
+const http = require("http");
+const socketIO = require("socket.io");
+
+const server = http.createServer(app); // Create server from Express app
+const io = socketIO(server, {
+	cors: {
+		origins: ["*"],
+	},
+});
+
+io.on("connection", () => {
+	console.log("user connected");
+});
+
+io.on("disconnection", () => {
+	console.log("user disconnected");
+});
+
 const path = require("path");
 const { auth, admin } = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");
@@ -11,9 +36,12 @@ const CustomersRoutes = require("./routes/customers.routes");
 const SuppliersRoutes = require("./routes/suppliers.routes");
 const AdminStockRoutes = require("./routes/admin-stock.routes");
 const UserStockRoutes = require("./routes/user-stock.routes");
+const { log } = require("console");
 
-// allow Cross-Origin calls to this app
-app.use(cors({ origin: "*" }));
+app.use((req, res, next) => {
+	req.io = io;
+	next();
+});
 
 // routes
 app.use("/api/auth", AuthRoutes);
@@ -27,9 +55,11 @@ app.use("/api/users", admin, UsersRoutes);
 app.use("/api/suppliers", admin, SuppliersRoutes);
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+	res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // handle errors
 app.use(errorHandler);
-module.exports = app;
+
+// server.listen(3500, () => console.log(`listening on port 3500 ...`));
+module.exports = server;
