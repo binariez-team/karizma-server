@@ -7,7 +7,7 @@ const errorHandler = (err, req, res, next) => {
 	console.error(err);
 
 	const timestamp = new Date().toISOString();
-	const logMessage = `${timestamp} [ERROR]: ${message}\n`;
+	const logMessage = `${timestamp} [ERROR]: ${err}\n`;
 	fs.appendFile(logFilePath, logMessage, (err) => {
 		if (err) {
 			console.error("Failed to write to log file:", err);

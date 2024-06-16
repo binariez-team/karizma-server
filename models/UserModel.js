@@ -5,7 +5,7 @@ class User {
 	// get all users except admin
 	static async getAll() {
 		const [rows] = await pool.query(
-			`SELECT user_id, username, first_name, last_name, view_stock, view_reports, delete_invoice, modify_customers FROM users WHERE user_type = 'user' AND is_deleted = 0`
+			`SELECT user_id, username, first_name, last_name, last_login FROM users WHERE user_type = 'user' AND is_deleted = 0`
 		);
 		return rows;
 	}
@@ -13,7 +13,7 @@ class User {
 	// get by id
 	static async getById(id) {
 		const [rows] = await pool.query(
-			`SELECT user_id, username, first_name, last_name, view_stock, view_reports, delete_invoice, modify_customers FROM users WHERE user_id = ?`,
+			`SELECT user_id, username, first_name, last_name, last_login FROM users WHERE user_id = ?`,
 			id
 		);
 		return rows;
