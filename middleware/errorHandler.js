@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const logFilePath = path.join(__dirname, "..", "error.log");
+const logFilePath = path.join(__dirname, "..", "errors", "error.log");
 
 const errorHandler = (err, req, res, next) => {
 	console.error(err);
