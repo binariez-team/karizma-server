@@ -12,15 +12,15 @@ class Product {
             I.whole_price_usd,
             I.unit_price_usd,
 
-            IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'SUPPLY'), 0) 
+            IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND user_id_fk = ? AND transaction_type = 'SUPPLY'), 0) 
 
-			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'RETURN'), 0)
+			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND user_id_fk = ? AND transaction_type = 'RETURN'), 0)
 
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'SALE'), 0)
+			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND user_id_fk = ? AND transaction_type = 'SALE'), 0)
 
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'DISPOSE'), 0)
-			
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'DELIVER'), 0)
+			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND user_id_fk = ? AND transaction_type = 'DISPOSE'), 0)
+
+			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND user_id_fk = ? AND transaction_type = 'DELIVER'), 0)
 
 			AS quantity
             FROM products P
@@ -31,7 +31,7 @@ class Product {
 			AND user_id_fk = ?
             ORDER BY P.product_id ASC`;
 
-		const [result] = await pool.query(query, id);
+		const [result] = await pool.query(query, [id, id, id, id, id, id]);
 		return result;
 	}
 
