@@ -2,7 +2,8 @@ const pool = require("../config/database");
 
 class Product {
 	// get all products
-	static async getAll() {
+	static async getAll(user) {
+		let id = user.user_id;
 		const query = `SELECT
             C.category_name,
 			B.brand_name,
@@ -12,9 +13,13 @@ class Product {
             I.unit_price_usd,
 
             IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'SUPPLY'), 0) 
+
 			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'RETURN'), 0)
+
 			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'SALE'), 0)
+
 			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'DISPOSE'), 0)
+			
 			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND transaction_type = 'DELIVER'), 0)
 
 			AS quantity
@@ -23,9 +28,10 @@ class Product {
             LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
 			LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
             WHERE P.is_deleted = 0
+			AND user_id_fk = ?
             ORDER BY P.product_id ASC`;
 
-		const [result] = await pool.query(query);
+		const [result] = await pool.query(query, id);
 		return result;
 	}
 

@@ -1,8 +1,9 @@
 const Product = require("../models/AdminStockModel");
 
 exports.getAllProducts = async (req, res, next) => {
+	let user = req.user;
 	try {
-		let products = await Product.getAll();
+		let products = await Product.getAll(user);
 		res.status(200).send(products);
 	} catch (error) {
 		next(error);
