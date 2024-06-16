@@ -21,7 +21,7 @@ const io = socketIO(server, {
 const fs = require("fs");
 const path = require("path");
 
-const logFilePath = path.join(__dirname, "errors", "error.log");
+const logFilePath = path.join(__dirname, "logs", "logs.log");
 io.on("connection", () => {
 	console.log("user connected");
 	const timestamp = new Date().toISOString();
