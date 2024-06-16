@@ -11,6 +11,7 @@ const http = require("http");
 const socketIO = require("socket.io");
 
 const server = http.createServer(app); // Create server from Express app
+
 const io = socketIO(server, {
 	cors: {
 		origins: ["*"],
