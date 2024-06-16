@@ -18,24 +18,7 @@ const io = socketIO(server, {
 	},
 });
 
-const fs = require("fs");
 const path = require("path");
-
-const logFilePath = path.join(__dirname, "logs", "logs.log");
-io.on("connection", () => {
-	console.log("user connected");
-	const timestamp = new Date().toISOString();
-	const logMessage = `${timestamp} [info]: User connected\n`;
-	fs.appendFile(logFilePath, logMessage, (err) => {
-		if (err) {
-			console.error("Failed to write to log file:", err);
-		}
-	});
-});
-
-io.on("disconnection", () => {
-	console.log("user disconnected");
-});
 
 const { auth, admin } = require("./middleware/auth");
 const errorHandler = require("./middleware/errorHandler");

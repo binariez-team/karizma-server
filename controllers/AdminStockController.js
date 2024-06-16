@@ -11,12 +11,14 @@ exports.getAllProducts = async (req, res, next) => {
 };
 
 exports.createProduct = async (req, res, next) => {
+	const io = req.io;
 	const data = req.body;
 	const user = req.user;
 	delete data.product_id;
 	try {
 		const result = await Product.create(data, user);
 		const [createdProduct] = await Product.getById(result.insertId);
+		io.emit("productAdded", createdProduct.product_name);
 		res.status(201).send(createdProduct);
 	} catch (error) {
 		next(error);
