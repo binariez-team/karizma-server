@@ -38,7 +38,7 @@ exports.updateProduct = async (req, res, next) => {
 		const [userUpdatedProduct] = await UserProduct.getProductById(
 			product.product_id
 		);
-		io.emit("productUpdated", updatedProduct);
+		io.emit("productUpdated", userUpdatedProduct);
 		res.status(201).send(updatedProduct);
 	} catch (error) {
 		next(error);
