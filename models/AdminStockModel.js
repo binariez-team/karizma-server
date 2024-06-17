@@ -157,7 +157,7 @@ class Product {
 
 			// delete from inventory
 			await connection.query(
-				`DELETE FROM inventory WHERE product_id_fk = ?`,
+				`UPDATE inventory SET is_deleted = 1 WHERE product_id_fk = ?`,
 				id
 			);
 
