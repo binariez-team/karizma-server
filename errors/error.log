@@ -1,4 +1,0 @@
-2024-06-16T17:50:41.254Z [ERROR]: Error: Unknown column 'view_stock' in 'field list'
-2024-06-17T09:08:12.530Z [ERROR]: ReferenceError: bcrypt is not defined
-2024-06-17T09:14:52.404Z [ERROR]: ReferenceError: Cannot access 'currentHashPassword' before initialization
-2024-06-17T09:17:02.296Z [ERROR]: ReferenceError: Cannot access 'currentHashPassword' before initialization
