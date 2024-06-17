@@ -35,10 +35,8 @@ exports.updateProduct = async (req, res, next) => {
 		const [updatedProduct] = await Product.getById(product.product_id);
 
 		// socket to push update
-		const [userUpdatedProduct] = await UserProduct.getById(
-			product.product_id
-		);
-		io.emit("productUpdated", userUpdatedProduct);
+		io.emit("productUpdated");
+
 		res.status(201).send(updatedProduct);
 	} catch (error) {
 		next(error);
