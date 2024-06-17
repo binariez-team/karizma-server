@@ -1,4 +1,5 @@
 const Product = require("../models/AdminStockModel");
+const UserProduct = require("../models/UserStockModel");
 
 exports.getAllProducts = async (req, res, next) => {
 	let user = req.user;
@@ -34,6 +35,9 @@ exports.updateProduct = async (req, res, next) => {
 		const [updatedProduct] = await Product.getById(product.product_id);
 
 		// socket to push update
+		const [userUpdatedProduct] = await UserProduct.getProductById(
+			product.product_id
+		);
 		io.emit("productUpdated", updatedProduct);
 		res.status(201).send(updatedProduct);
 	} catch (error) {
