@@ -30,6 +30,7 @@ const CustomersRoutes = require("./routes/customers.routes");
 const SuppliersRoutes = require("./routes/suppliers.routes");
 const AdminStockRoutes = require("./routes/admin-stock.routes");
 const UserStockRoutes = require("./routes/user-stock.routes");
+const ProfileRoutes = require("./routes/profile.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
@@ -38,9 +39,9 @@ app.use((req, res, next) => {
 
 // routes
 app.use("/api/auth", AuthRoutes);
-
 app.use("/api/customers", auth, CustomersRoutes);
 app.use("/api/user-stock", auth, UserStockRoutes);
+app.use("/api/profile", auth, ProfileRoutes);
 
 //admin routes
 app.use("/api/admin-stock", admin, AdminStockRoutes);
