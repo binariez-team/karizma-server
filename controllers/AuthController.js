@@ -25,7 +25,9 @@ exports.login = async (req, res, next) => {
 				user_type: results.user_type,
 				token: token,
 			};
-			io.emit("userLoggedIn", username);
+			if (user.user_type !== "admin") {
+				io.emit("userLoggedIn", username);
+			}
 			res.status(200).send(user);
 		} else {
 			res.status(401).send("Incorrect username or password!");
