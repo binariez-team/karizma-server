@@ -26,6 +26,7 @@ exports.createProduct = async (req, res, next) => {
 };
 
 exports.updateProduct = async (req, res, next) => {
+	const io = req.io;
 	const product = req.body;
 	const user = req.user;
 	try {
