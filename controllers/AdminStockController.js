@@ -31,6 +31,7 @@ exports.updateProduct = async (req, res, next) => {
 	try {
 		await Product.update(product, user);
 		const [updatedProduct] = await Product.getById(product.product_id);
+		io.emit("productAdded", updatedProduct.product_name);
 		res.status(201).send(updatedProduct);
 	} catch (error) {
 		next(error);
