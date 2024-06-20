@@ -3,15 +3,14 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
-const cors = require("cors");
 // allow Cross-Origin calls to this app
+const cors = require("cors");
 app.use(cors());
 
+// create server for socket.io
 const http = require("http");
 const socketIO = require("socket.io");
-
 const server = http.createServer(app); // Create server from Express app
-
 const io = socketIO(server, {
 	cors: {
 		origins: ["*"],
@@ -31,6 +30,7 @@ const SuppliersRoutes = require("./routes/suppliers.routes");
 const AdminStockRoutes = require("./routes/admin-stock.routes");
 const UserStockRoutes = require("./routes/user-stock.routes");
 const ProfileRoutes = require("./routes/profile.routes");
+const DeliverRoutes = require("./routes/deliver.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
@@ -47,6 +47,7 @@ app.use("/api/profile", auth, ProfileRoutes);
 app.use("/api/admin-stock", admin, AdminStockRoutes);
 app.use("/api/users", admin, UsersRoutes);
 app.use("/api/suppliers", admin, SuppliersRoutes);
+app.use("/api/deliver", admin, DeliverRoutes);
 
 app.get("/", (req, res) => {
 	res.sendFile(path.join(__dirname, "public", "index.html"));
