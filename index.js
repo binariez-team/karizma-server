@@ -31,6 +31,8 @@ const AdminStockRoutes = require("./routes/admin-stock.routes");
 const UserStockRoutes = require("./routes/user-stock.routes");
 const ProfileRoutes = require("./routes/profile.routes");
 const DeliverRoutes = require("./routes/deliver.routes");
+const SellOrdersRoutes = require("./routes/sell-orders.routes");
+const HistoryRoutes = require("./routes/history.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
@@ -42,6 +44,8 @@ app.use("/api/auth", AuthRoutes);
 app.use("/api/customers", auth, CustomersRoutes);
 app.use("/api/user-stock", auth, UserStockRoutes);
 app.use("/api/profile", auth, ProfileRoutes);
+app.use("/api/sell-orders", auth, SellOrdersRoutes);
+app.use("/api/history", auth, HistoryRoutes);
 
 //admin routes
 app.use("/api/admin-stock", admin, AdminStockRoutes);
