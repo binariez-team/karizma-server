@@ -23,6 +23,11 @@ router.get(
   CustomersController.getCustomerBalance
 );
 
+router.get(
+  "/user/:account_id/purchases/latest",
+  CustomersController.getCustomerLatestPurchases
+);
+
 //admin routes
 router.use(admin);
 

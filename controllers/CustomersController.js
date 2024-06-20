@@ -151,3 +151,17 @@ exports.getCustomerBalance = async (req, res, next) => {
     next(error);
   }
 };
+
+exports.getCustomerLatestPurchases = async (req, res, next) => {
+  const user_id = req.user.user_id;
+  const { account_id } = req.params;
+  try {
+    const purchases = await Customer.getCustomerLatestPurchases(
+      user_id,
+      account_id
+    );
+    res.status(200).json(purchases);
+  } catch (error) {
+    next(error);
+  }
+};
