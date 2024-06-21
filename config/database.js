@@ -8,7 +8,6 @@ if (process.env.NODE_ENV === "production") {
 		password: ",Yqv(j93q]4w",
 		database: "karizmam_karizma",
 		multipleStatements: true,
-		dateStrings: true,
 	});
 	pool.on("connection", (connection) => {
 		connection.query("SET time_zone = '+03:00'", (err) => {

@@ -3,6 +3,6 @@ const router = express.Router();
 
 const HistoryController = require("../controllers/HistoryController");
 
-router.post("/sales/search", HistoryController.fetchSalesHistory);
+router.post("/deliver/search", HistoryController.fetchDeliverHistory);
 
 module.exports = router;

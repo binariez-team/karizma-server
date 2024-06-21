@@ -33,6 +33,7 @@ const ProfileRoutes = require("./routes/profile.routes");
 const DeliverRoutes = require("./routes/deliver.routes");
 const SellOrdersRoutes = require("./routes/sell-orders.routes");
 const HistoryRoutes = require("./routes/history.routes");
+const AdminHistoryRoutes = require("./routes/admin-history.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
@@ -40,18 +41,19 @@ app.use((req, res, next) => {
 });
 
 // routes
-app.use("/api/auth", AuthRoutes);
-app.use("/api/customers", auth, CustomersRoutes);
-app.use("/api/user-stock", auth, UserStockRoutes);
-app.use("/api/profile", auth, ProfileRoutes);
-app.use("/api/sell-orders", auth, SellOrdersRoutes);
-app.use("/api/history", auth, HistoryRoutes);
+app.use("/auth", AuthRoutes);
+app.use("/customers", auth, CustomersRoutes);
+app.use("/user-stock", auth, UserStockRoutes);
+app.use("/profile", auth, ProfileRoutes);
+app.use("/sell-orders", auth, SellOrdersRoutes);
+app.use("/history", auth, HistoryRoutes);
 
 //admin routes
-app.use("/api/admin-stock", admin, AdminStockRoutes);
-app.use("/api/users", admin, UsersRoutes);
-app.use("/api/suppliers", admin, SuppliersRoutes);
-app.use("/api/deliver", admin, DeliverRoutes);
+app.use("/admin-stock", admin, AdminStockRoutes);
+app.use("/users", admin, UsersRoutes);
+app.use("/suppliers", admin, SuppliersRoutes);
+app.use("/deliver", admin, DeliverRoutes);
+app.use("/admin-history", admin, AdminHistoryRoutes);
 
 app.get("/", (req, res) => {
 	res.sendFile(path.join(__dirname, "public", "index.html"));

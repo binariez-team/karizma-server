@@ -21,6 +21,17 @@ class DeliverInvoice {
 			// inserted order ID
 			let order_id = result.insertId;
 
+			// generate invoice_number
+			let [[{ number }]] = await connection.query(
+				`SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 1000) + 1 AS number FROM deliver_orders`
+			);
+			let invoice_number = `DEL${number.toString().padStart(4, "0")}`;
+			// let invoice_number = invoice.invoice_number;
+			await connection.query(
+				`UPDATE deliver_orders SET invoice_number = ? WHERE order_id = ?`,
+				[invoice_number, order_id]
+			);
+
 			//	loop of each invoice item record
 			for (const record of items) {
 				delete record.product_name;

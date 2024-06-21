@@ -20,10 +20,10 @@ class SellOrders {
 
 			// generate invoice_number
 			let [[{ number }]] = await connection.query(
-				`SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 01000) + 1 AS number FROM sales_orders`
+				`SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 1000) + 1 AS number FROM sales_orders`
 			);
 
-			let invoice_number = `INV${number.toString().padStart(5, "0")}`;
+			let invoice_number = `INV${number.toString().padStart(4, "0")}`;
 
 			// let invoice_number = invoice.invoice_number;
 			await connection.query(
