@@ -22,6 +22,7 @@ exports.login = async (req, res, next) => {
 
 			const user = {
 				username: username,
+				first_name: results.first_name,
 				user_type: results.user_type,
 				token: token,
 			};
