@@ -2,8 +2,8 @@ const mysql = require("mysql2/promise");
 const fs = require("fs");
 const path = require("path");
 
-// Function to ensure the error directory exists
-const ensureErrorDirectoryExists = (directory) => {
+// Function to ensure the log directory exists
+const ensureLogDirectoryExists = (directory) => {
 	if (!fs.existsSync(directory)) {
 		fs.mkdirSync(directory, { recursive: true });
 	}
