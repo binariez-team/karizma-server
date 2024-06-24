@@ -1,5 +1,6 @@
 const pool = require("../config/database");
-const moment = require("moment");
+// const moment = require("moment");
+const moment = require("moment-timezone");
 
 class DeliverInvoice {
 	static async create(order, items, user) {
@@ -7,6 +8,7 @@ class DeliverInvoice {
 		try {
 			await connection.beginTransaction();
 
+			moment.tz.setDefault("Asia/Beirut");
 			order.order_datetime = moment(order.order_datetime).format(
 				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
 			);
