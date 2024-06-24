@@ -17,9 +17,8 @@ const errorHandler = (err, req, res, next) => {
 	const errorLogPath = path.join(errorDirectory, "error.log");
 
 	if (!fs.existsSync("../errors")) {
-		console.log("called");
 		fs.mkdirSync("../errors", { recursive: true }); // Create directory if it doesn't exist
-		fs.writeFileSync(logFilePath);
+		fs.writeFileSync(errorLogPath);
 	}
 
 	const timestamp = new Date().toISOString();
