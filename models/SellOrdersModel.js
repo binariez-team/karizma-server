@@ -1,5 +1,6 @@
 const pool = require("../config/database");
-const moment = require("moment");
+// const moment = require("moment");
+const moment = require("moment-timezone");
 
 class SellOrders {
 	static async addOrder(order, items, user_id) {
@@ -7,6 +8,7 @@ class SellOrders {
 		try {
 			await connection.beginTransaction();
 
+			moment.tz.setDefault("Asia/Beirut");
 			order.order_datetime = moment(order.order_datetime).format(
 				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
 			);
@@ -62,7 +64,6 @@ class SellOrders {
 					//add order_items to inventory transactions
 					queries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (?,?,?, 'SALE');`;
 				});
-				console.log(params);
 				await connection.query(queries, params);
 			}
 
