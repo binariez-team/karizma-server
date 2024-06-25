@@ -11,7 +11,7 @@ exports.updateProfile = async (req, res, next) => {
 	try {
 		let [validateUser] = await User.getByIdAndUsername(
 			user.user_id,
-			user.username
+			new_username
 		);
 		if (validateUser) {
 			res.status(406).send({ message: "Username already exists" });
@@ -26,12 +26,14 @@ exports.updateProfile = async (req, res, next) => {
 				{
 					user_id: result.user_id.toString(),
 					new_username,
+					user_type: result.user_type,
 				},
-				"$2a$_cJDUV-$AarGhFE-Xdji8#*(#$_ZXfdI@#!D-Nv0E_Mm3a"
+				"$3a#_cJDUV-$QsRewWXcyH-Xdji8#%^$*(_ZkfNdI@#!D-Nv0E_M3a"
 			);
-
 			const updatedUser = {
 				username: new_username,
+				first_name: result.first_name,
+				user_type: result.user_type,
 				token: token,
 			};
 			res.status(200).send(updatedUser);

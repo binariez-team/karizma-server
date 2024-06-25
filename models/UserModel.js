@@ -13,7 +13,7 @@ class User {
 	// get by id
 	static async getById(id) {
 		const [rows] = await pool.query(
-			`SELECT user_id, username, first_name, last_name, last_login FROM users WHERE user_id = ?`,
+			`SELECT user_id, username, first_name, last_name, user_type, last_login FROM users WHERE user_id = ?`,
 			id
 		);
 		return rows;
