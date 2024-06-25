@@ -121,7 +121,7 @@ class Customer {
                     a.user_id = ?  AND i.customer_id = ?
             ) ranked_purchases
             WHERE
-                purchase_rank <= 3;`,
+                purchase_rank <= 1;`,
 			[user_id, account_id]
 		);
 		return result;
