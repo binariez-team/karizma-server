@@ -1,8 +1,8 @@
 const express = require("express");
 const router = express.Router();
 
-const HistoryController = require("../controllers/HistoryController");
+const AdminHistoryController = require("../controllers/AdminHistoryController");
 
-router.post("/deliver/search", HistoryController.fetchDeliverHistory);
+router.post("/deliver/search", AdminHistoryController.fetchDeliverHistory);
 
 module.exports = router;

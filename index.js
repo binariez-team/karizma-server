@@ -34,27 +34,32 @@ const DeliverRoutes = require("./routes/deliver.routes");
 const SellOrdersRoutes = require("./routes/sell-orders.routes");
 const HistoryRoutes = require("./routes/history.routes");
 const AdminHistoryRoutes = require("./routes/admin-history.routes");
+const UserHistoryRoutes = require("./routes/user-history.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
 	next();
 });
 
-// routes
+// common routes
 app.use("/auth", AuthRoutes);
 app.use("/customers", auth, CustomersRoutes);
-app.use("/user-stock", auth, UserStockRoutes);
 app.use("/profile", auth, ProfileRoutes);
 app.use("/sell-orders", auth, SellOrdersRoutes);
 app.use("/history", auth, HistoryRoutes);
 
-//admin routes
+// admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);
 app.use("/users", admin, UsersRoutes);
 app.use("/suppliers", admin, SuppliersRoutes);
 app.use("/deliver", admin, DeliverRoutes);
 app.use("/admin-history", admin, AdminHistoryRoutes);
 
+// user routes
+app.use("/user-history", auth, UserHistoryRoutes);
+app.use("/user-stock", auth, UserStockRoutes);
+
+// check API status page
 app.get("/", (req, res) => {
 	res.sendFile(path.join(__dirname, "public", "index.html"));
 });

@@ -43,7 +43,6 @@ class History {
 
 	// fetch deliver invoices
 	static async fetchDeliverHistory(criteria) {
-		console.log(criteria.order_date);
 		let sql = `SELECT
                 U.first_name AS first_name,
                 O.*,
