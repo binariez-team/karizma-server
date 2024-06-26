@@ -33,6 +33,25 @@ class UserHistory {
 		const [rows] = await pool.query(sql, params);
 		return rows;
 	}
+
+	// fetch pending
+	static async fetchPendingInvoices(user_id) {
+		let sql = `SELECT
+                O.*,
+                DATE(O.order_datetime) AS order_date,
+                JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
+            	FROM deliver_orders O
+            	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
+				INNER JOIN products S ON S.product_id = M.product_id
+				WHERE O.is_deleted = 0
+				AND O.is_approved = 0
+				AND O.user_id_fk = ? 
+				GROUP BY O.order_id
+				ORDER BY order_date DESC, O.invoice_number DESC`;
+
+		const [rows] = await pool.query(sql, [user_id]);
+		return rows;
+	}
 }
 
 module.exports = UserHistory;
