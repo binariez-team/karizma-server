@@ -12,6 +12,7 @@ class UserHistory {
             	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
 				INNER JOIN products S ON S.product_id = M.product_id
 				WHERE O.is_deleted = 0
+				AND O.is_approved = 1
 				AND O.user_id_fk = ? `;
 		const params = [user_id];
 		if (criteria.invoice_number) {
