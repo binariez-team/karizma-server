@@ -52,6 +52,74 @@ class UserHistory {
 		const [rows] = await pool.query(sql, [user_id]);
 		return rows;
 	}
+
+	// approve pending invoice
+	static async approvePendingInvoice(id, user_id, admin_id) {
+		const connection = await pool.getConnection();
+		try {
+			await connection.beginTransaction();
+
+			await connection.query(
+				`UPDATE deliver_orders SET is_approved = 1 WHERE order_id = ?`,
+				id
+			);
+
+			//	********************************
+			//	loop of each invoice item record
+			//	********************************
+
+			let [items] = await connection.query(
+				`SELECT * FROM deliver_order_items WHERE order_id_fk = ?`,
+				id
+			);
+			for (const record of items) {
+				// check if inventory records has previously inserted
+				let [[inserted]] = await connection.query(
+					`SELECT * FROM inventory WHERE product_id_fk = ? AND user_id_fk = ? AND is_deleted = 0;`,
+					[record.product_id, user_id]
+				);
+
+				// if records have not been inserted before
+				if (!inserted) {
+					// prepare default inventory record prices (created by admin)
+					let [[rows]] = await connection.query(
+						`SELECT * FROM inventory WHERE user_id_fk = ? AND product_id_fk = ?;`,
+						[admin_id, record.product_id]
+					);
+					let {
+						grandwhole_price_usd,
+						whole_price_usd,
+						unit_price_usd,
+					} = rows;
+					const inventoryRecord = {
+						product_id_fk: record.product_id,
+						user_id_fk: user_id,
+						grandwhole_price_usd: grandwhole_price_usd,
+						whole_price_usd: whole_price_usd,
+						unit_price_usd: unit_price_usd,
+					};
+					// insert a new inventory record with default prices
+					await connection.query(
+						`INSERT INTO inventory SET ?`,
+						inventoryRecord
+					);
+				}
+
+				// add user record to inventory transactions
+				await connection.query(
+					`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (${record.product_id}, ${user_id}, ${record.quantity}, 'DELIVER');`
+				);
+			}
+
+			// after successfull
+			await connection.commit();
+		} catch (error) {
+			await connection.rollback();
+			throw error;
+		} finally {
+			connection.release();
+		}
+	}
 }
 
 module.exports = UserHistory;
