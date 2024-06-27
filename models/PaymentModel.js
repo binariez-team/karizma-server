@@ -13,11 +13,17 @@ class Payment {
 				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
 			);
 
+			let [[{ number }]] = await connection.query(
+				`SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`
+			);
+
+			let payment_number = `PAY${number.toString().padStart(4, "0")}`;
+
 			//insert to vouchers and journal_items
 			let query = `INSERT INTO journal_vouchers ( user_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
 				user_id,
-				null,
+				payment_number,
 				paymentData.payment_date,
 				"Customer Payment",
 				paymentData.amount,
