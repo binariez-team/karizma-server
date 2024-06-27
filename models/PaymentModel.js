@@ -25,7 +25,7 @@ class Payment {
 				user_id,
 				payment_number,
 				paymentData.payment_date,
-				"Customer Payment",
+				"Payment",
 				paymentData.amount,
 			]);
 
