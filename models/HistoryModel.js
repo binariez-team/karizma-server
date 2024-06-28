@@ -83,6 +83,7 @@ class History {
 				A.name AS partner_name,
 				A.phone AS partner_phone,
 				A.address AS partner_address,
+				A.account_id AS partner_id,
 				P.*,
 				DATE(P.journal_date) AS payment_date
 			FROM journal_vouchers P

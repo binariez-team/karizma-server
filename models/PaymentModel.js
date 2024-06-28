@@ -67,6 +67,92 @@ class Payment {
 			connection.release();
 		}
 	}
+
+	static async editCustomerPayment(user_id, paymentData) {
+		const connection = await pool.getConnection();
+		try {
+			await connection.beginTransaction();
+
+			moment.tz.setDefault("Asia/Beirut");
+			paymentData.payment_date = moment(paymentData.payment_date).format(
+				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+			);
+
+			//insert to vouchers and journal_items
+			let query = `UPDATE journal_vouchers SET journal_date = ? ,  total_value = ? WHERE journal_id = ? and user_id = ?`;
+			const [journal_voucher] = await connection.query(query, [
+				paymentData.payment_date,
+				paymentData.amount,
+				paymentData.journal_id,
+				user_id,
+			]);
+
+			let [_531] = await Accounts.getIdByAccountNumber("531");
+
+			await connection.query(
+				`UPDATE journal_items SET credit=?, journal_date=? WHERE journal_id_fk=? AND account_id_fk=?`,
+				[
+					paymentData.amount,
+					paymentData.payment_date,
+					paymentData.journal_id,
+					_531.id,
+				]
+			);
+
+			let [_413] = await Accounts.getIdByAccountNumber("413");
+
+			await connection.query(
+				`UPDATE journal_items SET debit=?, journal_date=?, partner_id_fk=? WHERE journal_id_fk=? AND account_id_fk=?`,
+				[
+					paymentData.amount,
+					paymentData.payment_date,
+					paymentData.customer_id,
+					paymentData.journal_id,
+					_413.id,
+				]
+			);
+
+			await connection.commit();
+		} catch (error) {
+			await connection.rollback();
+			throw error;
+		} finally {
+			connection.release();
+		}
+	}
+	static async deletePayment(user_id, journal_id) {
+		const connection = await pool.getConnection();
+		try {
+			await connection.beginTransaction();
+
+			let [journal_items] = await connection.query(
+				`SELECT journal_item_id FROM journal_items ji
+                inner join journal_vouchers jv 
+                ON jv.journal_id = ji.journal_id_fk 
+                WHERE journal_id_fk = ? AND jv.user_id = ?`,
+				[journal_id, user_id]
+			);
+			journal_items = journal_items.map((item) => item.journal_item_id);
+			console.log(journal_items);
+
+			await connection.query(
+				`UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,
+				[journal_items]
+			);
+
+			await connection.query(
+				`UPDATE journal_vouchers SET is_deleted = 1 WHERE journal_id = ? AND user_id = ?`,
+				[journal_id, user_id]
+			);
+
+			await connection.commit();
+		} catch (error) {
+			await connection.rollback();
+			throw error;
+		} finally {
+			connection.release();
+		}
+	}
 	static async addSupplierPayment(paymentData) {}
 }
 module.exports = Payment;
