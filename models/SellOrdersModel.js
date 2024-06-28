@@ -19,7 +19,7 @@ class SellOrders {
 			const [journal_voucher] = await connection.query(query, [
 				user_id,
 				order.order_datetime,
-				"Sales Invoice",
+				"Invoice",
 				order.total_amount,
 				order.exchange_rate,
 			]);
@@ -39,7 +39,10 @@ class SellOrders {
 				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
@@ -54,7 +57,10 @@ class SellOrders {
 				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 			if (order.vat_value > 0) {
 				let [_44271] = await Accounts.getIdByAccountNumber("44271");
 				const thirdItem = {
@@ -68,7 +74,10 @@ class SellOrders {
 					credit: order.vat_value,
 					exchange_value: order.exchange_rate,
 				};
-				await connection.query(`INSERT INTO journal_items SET ?`, thirdItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					thirdItem
+				);
 			}
 
 			const [result] = await connection.query(
@@ -175,7 +184,10 @@ class SellOrders {
 
 			//delete voucher and items
 			let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
-			await connection.query(deleteVoucherQuery, orderCheck.journal_voucher_id);
+			await connection.query(
+				deleteVoucherQuery,
+				orderCheck.journal_voucher_id
+			);
 
 			let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
 			await connection.query(
@@ -199,7 +211,10 @@ class SellOrders {
 			);
 
 			// fix invoice number
-			order.invoice_number = `INV${order.invoice_number.padStart(4, "0")}`;
+			order.invoice_number = `INV${order.invoice_number.padStart(
+				4,
+				"0"
+			)}`;
 
 			//insert to vouchers and journal_items
 			let query = `INSERT INTO journal_vouchers (journal_id, user_id, journal_number, journal_date, journal_description, total_value, exchange_value) VALUES (?, ?, ?, ?, ?, ?, ?)`;
@@ -228,7 +243,10 @@ class SellOrders {
 				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
@@ -243,7 +261,10 @@ class SellOrders {
 				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 			if (order.vat_value > 0) {
 				let [_44271] = await Accounts.getIdByAccountNumber("44271");
 				const thirdItem = {
@@ -257,7 +278,10 @@ class SellOrders {
 					credit: order.vat_value,
 					exchange_value: order.exchange_rate,
 				};
-				await connection.query(`INSERT INTO journal_items SET ?`, thirdItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					thirdItem
+				);
 			}
 
 			//add user_id to order
@@ -318,7 +342,10 @@ class SellOrders {
 
 			//delete voucher and items
 			let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
-			await connection.query(deleteVoucherQuery, orderCheck.journal_voucher_id);
+			await connection.query(
+				deleteVoucherQuery,
+				orderCheck.journal_voucher_id
+			);
 
 			let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
 			await connection.query(
