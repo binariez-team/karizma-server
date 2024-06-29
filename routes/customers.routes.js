@@ -6,26 +6,30 @@ const CustomersController = require("../controllers/CustomersController");
 
 router.get("/user", CustomersController.getCustomersByUserId);
 router.get(
-  "/user/:account_id",
+	"/user/:account_id",
 
-  CustomersController.getCustomerByIdAndUserId
+	CustomersController.getCustomerByIdAndUserId
 );
 router.post("/user", CustomersController.createUserCustomer);
 router.put("/user/:account_id", CustomersController.updateUserCustomer);
 router.delete(
-  "/user/:account_id",
+	"/user/:account_id",
 
-  CustomersController.deleteUserCustomer
+	CustomersController.deleteUserCustomer
 );
 
 router.get(
-  "/user/transactions/:account_id&:start&:end",
-  CustomersController.getCustomerBalance
+	"/user/transactions/:account_id&:start&:end",
+	CustomersController.getCustomerBalance
 );
 
 router.get(
-  "/user/:account_id/purchases/latest",
-  CustomersController.getCustomerLatestPurchases
+	"/user/:account_id/purchases/latest",
+	CustomersController.getCustomerLatestPurchases
+);
+router.get(
+	"/user/:account_id/balance",
+	CustomersController.getCustomerTotalBalance
 );
 
 //admin routes

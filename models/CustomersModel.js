@@ -110,7 +110,7 @@ class Customer {
                 im.unit_price,
                 im.price_type,
 
-                ROW_NUMBER() OVER (PARTITION BY im.product_id, im.price_type ORDER BY i.order_datetime DESC) AS purchase_rank
+                ROW_NUMBER() OVER (PARTITION BY im.product_id ORDER BY i.order_datetime DESC) AS purchase_rank
             FROM
                 sales_orders i
             JOIN
@@ -118,12 +118,27 @@ class Customer {
                 LEFT JOIN
                 	accounts a ON a.account_id = i.customer_id
                 WHERE
-                    a.user_id = ?  AND i.customer_id = ?
+                    a.user_id = ?  AND i.customer_id = ? AND im.is_deleted = 0
             ) ranked_purchases
             WHERE
                 purchase_rank <= 1;`,
 			[user_id, account_id]
 		);
+		return result;
+	}
+
+	static async getCustomerTotalBalance(user_id, account_id) {
+		const query = `SELECT 
+					COALESCE(SUM(ji.debit) - SUM(ji.credit), 0) AS balance
+				FROM 
+					journal_vouchers jv
+				LEFT JOIN 
+					journal_items ji ON jv.journal_id = ji.journal_id_fk
+				WHERE 
+					ji.partner_id_fk = ?
+					AND jv.user_id = ?
+					AND ji.is_deleted = 0`;
+		const [[result]] = await pool.query(query, [account_id, user_id]);
 		return result;
 	}
 }
