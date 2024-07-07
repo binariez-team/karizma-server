@@ -82,5 +82,12 @@ class Accounts {
 		const [id] = await pool.query(query, number);
 		return id;
 	}
+
+	//get multi accounts starting with account number
+	static async getAccountsByAccountNumber(account_number) {
+		const query = `SELECT * FROM chart_of_accounts WHERE account_number LIKE ?`;
+		const [rows] = await pool.query(query, account_number);
+		return rows;
+	}
 }
 module.exports = Accounts;

@@ -36,6 +36,8 @@ const HistoryRoutes = require("./routes/history.routes");
 const AdminHistoryRoutes = require("./routes/admin-history.routes");
 const UserHistoryRoutes = require("./routes/user-history.routes");
 const PaymentRoutes = require("./routes/payment.routes");
+const BalanceRoutes = require("./routes/balance.routes");
+const ExpenseRoutes = require("./routes/expense.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
@@ -49,6 +51,8 @@ app.use("/profile", auth, ProfileRoutes);
 app.use("/sell-orders", auth, SellOrdersRoutes);
 app.use("/history", auth, HistoryRoutes);
 app.use("/payment", auth, PaymentRoutes);
+app.use("/balance", auth, BalanceRoutes);
+app.use("/expense", auth, ExpenseRoutes);
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);
