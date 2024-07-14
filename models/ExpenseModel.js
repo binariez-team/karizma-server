@@ -11,7 +11,7 @@ class Expense {
         ON jv.journal_id = ji.journal_id_fk 
         JOIN chart_of_accounts coa
         ON coa.id = ji.account_id_fk
-        WHERE jv.user_id = ? AND jv.journal_number LIKE 'EXP%'
+        WHERE jv.user_id = ? AND jv.journal_description = 'Expense'
         AND ji.is_deleted = 0
         AND ji.account_id_fk != ?`;
 		const [expenses] = await pool.query(query, [user_id, _531.id]);
@@ -53,6 +53,7 @@ class Expense {
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: _531.id,
+				user_id: user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
 				currency: "USD",

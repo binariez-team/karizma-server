@@ -112,6 +112,30 @@ class History {
 		const [rows] = await pool.query(sql, params);
 		return rows;
 	}
+
+	//fetch transfer history
+	static async fetchUserMoneyTransferHistory(user_id, criteria) {
+		let sql = ` SELECT jv.journal_id,jv.journal_number,jv.journal_date as payment_date,jv.total_value
+        FROM journal_vouchers jv
+        WHERE jv.user_id = ? AND jv.journal_description = 'Transfer'
+        AND jv.is_deleted = 0`;
+		const params = [user_id];
+		if (criteria.payment_number) {
+			sql += ` AND jv.journal_number = ?`;
+			params.push(criteria.payment_number);
+		}
+		if (criteria.payment_date) {
+			sql += ` AND DATE(jv.journal_date) = ?`;
+			params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
+		}
+		sql += ` ORDER BY payment_date DESC, jv.journal_number DESC
+		LIMIT ? OFFSET ?`;
+		params.push(criteria.limit || 100);
+		params.push(criteria.offset || 0);
+
+		const [transfers] = await pool.query(sql, params);
+		return transfers;
+	}
 }
 
 module.exports = History;
