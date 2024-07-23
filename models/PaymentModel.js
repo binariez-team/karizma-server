@@ -37,7 +37,7 @@ class Payment {
 				account_id_fk: _531.id,
 				user_id: user_id,
 				reference_number: paymentData.reference_number,
-				partner_id_fk: null,
+				partner_id_fk: paymentData.customer_id,
 				currency: "USD",
 				debit: 0,
 				credit: paymentData.amount,
@@ -52,7 +52,7 @@ class Payment {
 				journal_date: paymentData.payment_date,
 				account_id_fk: _413.id,
 				reference_number: paymentData.reference_number,
-				partner_id_fk: paymentData.customer_id,
+				partner_id_fk: null,
 				currency: "USD",
 				debit: paymentData.amount,
 				credit: 0,
@@ -91,10 +91,11 @@ class Payment {
 			let [_531] = await Accounts.getIdByAccountNumber("531");
 
 			await connection.query(
-				`UPDATE journal_items SET credit=?, journal_date=? WHERE journal_id_fk=? AND account_id_fk=?`,
+				`UPDATE journal_items SET credit=?, journal_date=?, partner_id_fk=? WHERE journal_id_fk=? AND account_id_fk=?`,
 				[
 					paymentData.amount,
 					paymentData.payment_date,
+					paymentData.customer_id,
 					paymentData.journal_id,
 					_531.id,
 				]
@@ -103,11 +104,10 @@ class Payment {
 			let [_413] = await Accounts.getIdByAccountNumber("413");
 
 			await connection.query(
-				`UPDATE journal_items SET debit=?, journal_date=?, partner_id_fk=? WHERE journal_id_fk=? AND account_id_fk=?`,
+				`UPDATE journal_items SET debit=?, journal_date=? WHERE journal_id_fk=? AND account_id_fk=?`,
 				[
 					paymentData.amount,
 					paymentData.payment_date,
-					paymentData.customer_id,
 					paymentData.journal_id,
 					_413.id,
 				]
@@ -134,7 +134,6 @@ class Payment {
 				[journal_id, user_id]
 			);
 			journal_items = journal_items.map((item) => item.journal_item_id);
-			console.log(journal_items);
 
 			await connection.query(
 				`UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,

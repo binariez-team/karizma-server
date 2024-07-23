@@ -34,8 +34,8 @@ class SellOrders {
 				reference_number: order.reference_number,
 				partner_id_fk: order.customer_id,
 				currency: "USD",
-				debit: 0,
-				credit: order.total_amount,
+				debit: order.total_amount,
+				credit: 0,
 				exchange_value: order.exchange_rate,
 			};
 
@@ -49,8 +49,8 @@ class SellOrders {
 				reference_number: order.reference_number,
 				partner_id_fk: null,
 				currency: "USD",
-				debit: order.total_amount,
-				credit: 0,
+				debit: 0,
+				credit: order.total_amount,
 				exchange_value: order.exchange_rate,
 			};
 
@@ -158,7 +158,7 @@ class SellOrders {
 					account_id_fk: _531.id,
 					user_id: user_id,
 					reference_number: payment.reference_number,
-					partner_id_fk: null,
+					partner_id_fk: payment.customer_id,
 					currency: "USD",
 					debit: 0,
 					credit: payment.amount,
@@ -173,7 +173,7 @@ class SellOrders {
 					journal_date: payment.payment_date,
 					account_id_fk: _413.id,
 					reference_number: payment.reference_number,
-					partner_id_fk: payment.customer_id,
+					partner_id_fk: null,
 					currency: "USD",
 					debit: payment.amount,
 					credit: 0,
@@ -203,14 +203,12 @@ class SellOrders {
 				`SELECT * FROM sales_orders WHERE order_id = ? AND user_id = ?`,
 				[order_id, user_id]
 			);
-			console.log(orderCheck, order_id, order, user_id);
 			if (!orderCheck) throw new Error("Order not found");
 
 			// update inventory qty for deleted items
 			let inventoryQueries = "";
 			let product_id = null;
 			let quantity = null;
-			console.log(order_id);
 
 			// add deleted items to inventory transactions
 			await connection.query(
@@ -261,7 +259,7 @@ class SellOrders {
 				user_id,
 				order.invoice_number,
 				order.order_datetime,
-				"Sales Invoice",
+				"Invoice",
 				order.total_amount,
 				order.exchange_rate,
 			]);
@@ -276,8 +274,8 @@ class SellOrders {
 				reference_number: order.reference_number,
 				partner_id_fk: order.customer_id,
 				currency: "USD",
-				debit: 0,
-				credit: order.total_amount,
+				debit: order.total_amount,
+				credit: 0,
 				exchange_value: order.exchange_rate,
 			};
 
@@ -291,8 +289,8 @@ class SellOrders {
 				reference_number: order.reference_number,
 				partner_id_fk: null,
 				currency: "USD",
-				debit: order.total_amount,
-				credit: 0,
+				debit: 0,
+				credit: order.total_amount,
 				exchange_value: order.exchange_rate,
 			};
 
