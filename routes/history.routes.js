@@ -9,5 +9,6 @@ router.post(
 	"/money-transfer/search",
 	HistoryController.fetchUserMoneyTransferHistory
 );
+router.post("/return/search", HistoryController.fetchReturnHistory);
 
 module.exports = router;

@@ -35,3 +35,14 @@ exports.fetchUserMoneyTransferHistory = async (req, res, next) => {
 		next(error);
 	}
 };
+
+exports.fetchReturnHistory = async (req, res, next) => {
+	try {
+		const user_id = req.user.user_id;
+		const criteria = req.body;
+		let returns = await History.fetchReturnHistory(user_id, criteria);
+		res.status(200).send(returns);
+	} catch (error) {
+		next(error);
+	}
+};

@@ -136,6 +136,45 @@ class History {
 		const [transfers] = await pool.query(sql, params);
 		return transfers;
 	}
+
+	//fetch return history
+	static async fetchReturnHistory(user_id, criteria) {
+		let sql = `SELECT
+                A.name AS customer_name,
+                A.phone AS customer_phone,
+                A.address AS customer_address,
+                A.financial_number,
+                RO.*,
+                DATE(RO.order_datetime) AS order_date,
+                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
+            FROM return_orders RO
+            INNER JOIN return_order_items M ON RO.order_id = M.order_id
+            INNER JOIN products S ON S.product_id = M.product_id
+            INNER JOIN accounts  A ON RO.customer_id = A.account_id
+            WHERE RO.is_deleted = 0 AND A.user_id = ? `;
+		const params = [user_id];
+		if (criteria.invoice_number) {
+			sql += ` AND RO.invoice_number = ?`;
+			params.push(criteria.invoice_number);
+		}
+		if (criteria.customer_id) {
+			sql += ` AND RO.customer_id = ?`;
+			params.push(criteria.customer_id);
+		}
+		if (criteria.invoice_date) {
+			sql += ` AND DATE(order_datetime) = ?`;
+			params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+		}
+
+		sql += ` GROUP BY RO.order_id
+        ORDER BY order_date DESC, RO.invoice_number DESC
+        LIMIT ? OFFSET ?`;
+		params.push(criteria.limit || 100);
+		params.push(criteria.offset || 0);
+
+		const [rows] = await pool.query(sql, params);
+		return rows;
+	}
 }
 
 module.exports = History;

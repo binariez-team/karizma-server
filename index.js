@@ -39,6 +39,7 @@ const PaymentRoutes = require("./routes/payment.routes");
 const BalanceRoutes = require("./routes/balance.routes");
 const ExpenseRoutes = require("./routes/expense.routes");
 const ReportRoutes = require("./routes/report.routes");
+const ReturnRoutes = require("./routes/return.routes");
 
 app.use((req, res, next) => {
 	req.io = io;
@@ -55,6 +56,7 @@ app.use("/payment", auth, PaymentRoutes);
 app.use("/balance", auth, BalanceRoutes);
 app.use("/expense", auth, ExpenseRoutes);
 app.use("/report", auth, ReportRoutes);
+app.use("/return", auth, ReturnRoutes);
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);
