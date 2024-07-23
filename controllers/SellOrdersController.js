@@ -32,11 +32,11 @@ exports.editOrder = async (req, res, next) => {
 		next(error);
 	}
 };
-exports.deleteOrder = (req, res, next) => {
+exports.deleteOrder = async (req, res, next) => {
 	try {
 		const order_id = req.params.id;
 		const user_id = req.user.user_id;
-		SellOrders.deleteOrder(order_id, user_id);
+		await SellOrders.deleteOrder(order_id, user_id);
 		res.status(200).json({ message: "Order deleted successfully" });
 	} catch (error) {
 		next(error);
