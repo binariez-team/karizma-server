@@ -175,6 +175,42 @@ class History {
 		const [rows] = await pool.query(sql, params);
 		return rows;
 	}
+
+	//fetch suppliers payment history
+	static async fetchSuppliersPaymentHistory(user_id, criteria) {
+		let sql = `SELECT
+					A.name AS partner_name,
+					A.phone AS partner_phone,
+					A.address AS partner_address,
+					A.account_id AS partner_id,
+					P.*,
+					DATE(P.journal_date) AS payment_date
+				FROM journal_vouchers P
+				INNER JOIN journal_items I ON P.journal_id = I.journal_id_fk
+				INNER JOIN accounts A ON I.partner_id_fk = A.account_id
+				WHERE P.is_deleted = 0 AND P.user_id = ? AND journal_description = 'Receipt'`;
+		const params = [user_id];
+		if (criteria.payment_number) {
+			sql += ` AND P.journal_number = ?`;
+			params.push(criteria.payment_number);
+		}
+		if (criteria.partner_id) {
+			sql += ` AND I.partner_id_fk = ?`;
+			params.push(criteria.partner_id);
+		}
+		if (criteria.payment_date) {
+			sql += ` AND DATE(P.journal_date) = ?`;
+			params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
+		}
+
+		sql += ` ORDER BY payment_date DESC, P.journal_number DESC
+			LIMIT ? OFFSET ?`;
+		params.push(criteria.limit || 100);
+		params.push(criteria.offset || 0);
+
+		const [rows] = await pool.query(sql, params);
+		return rows;
+	}
 }
 
 module.exports = History;

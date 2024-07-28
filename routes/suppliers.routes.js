@@ -10,4 +10,9 @@ router.post("/", SuppliersController.createSupplier);
 router.put("/:id", SuppliersController.updateSupplier);
 router.delete("/:id", SuppliersController.deleteSupplier);
 
+router.get(
+	"/transactions/:account_id&:start&:end",
+	SuppliersController.getSupplierBalance
+);
+
 module.exports = router;

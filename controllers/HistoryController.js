@@ -46,3 +46,17 @@ exports.fetchReturnHistory = async (req, res, next) => {
 		next(error);
 	}
 };
+
+exports.fetchSuppliersPaymentHistory = async (req, res, next) => {
+	try {
+		const user_id = req.user.user_id;
+		let criteria = req.body;
+		let payments = await History.fetchSuppliersPaymentHistory(
+			user_id,
+			criteria
+		);
+		res.status(200).send(payments);
+	} catch (error) {
+		next(error);
+	}
+};

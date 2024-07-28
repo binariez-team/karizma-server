@@ -1,4 +1,5 @@
 const Supplier = require("../models/SuppliersModel");
+const Accounts = require("../models/AccountsModel");
 
 // get suppliers
 exports.getAllSuppliers = async (req, res) => {
@@ -60,5 +61,22 @@ exports.deleteSupplier = async (req, res) => {
 		res.status(201).json({ message: "Supplier deleted successfully" });
 	} catch (error) {
 		res.status(500).json({ message: error.message });
+	}
+};
+
+//get supplier transactions by user id
+exports.getSupplierBalance = async (req, res, next) => {
+	const user_id = req.user.user_id;
+	const { account_id, start, end } = req.params;
+	try {
+		const balance = await Accounts.getAccountDetailsById(
+			user_id,
+			account_id,
+			start,
+			end
+		);
+		res.status(200).json(balance);
+	} catch (error) {
+		next(error);
 	}
 };
