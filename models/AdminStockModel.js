@@ -22,6 +22,12 @@ class Product {
 
 			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id AND user_id_fk = ? AND transaction_type = 'DELIVER'), 0)
 
+			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSERETURN'), 0)
+
+			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDISPOSE'), 0)
+
+
+
 			AS quantity
             FROM products P
 			INNER JOIN inventory I ON P.product_id = I.product_id_fk
@@ -31,7 +37,7 @@ class Product {
 			AND user_id_fk = ?
             ORDER BY P.product_id ASC`;
 
-		const [result] = await pool.query(query, [id, id, id, id, id, id]);
+		const [result] = await pool.query(query, [id, id, id, id, id, id, id, id]);
 		return result;
 	}
 
@@ -116,10 +122,10 @@ class Product {
 			};
 
 			// update product table
-			await connection.query(
-				`UPDATE products SET ? WHERE product_id = ?`,
-				[product, data.product_id]
-			);
+			await connection.query(`UPDATE products SET ? WHERE product_id = ?`, [
+				product,
+				data.product_id,
+			]);
 
 			// update inventory
 			let inventory = {
