@@ -60,3 +60,14 @@ exports.fetchSuppliersPaymentHistory = async (req, res, next) => {
 		next(error);
 	}
 };
+
+exports.fetchDisposeHistory = async (req, res, next) => {
+	try {
+		const user_id = req.user.user_id;
+		let criteria = req.body;
+		let disposals = await History.fetchDisposeHistory(user_id, criteria);
+		res.status(200).send(disposals);
+	} catch (error) {
+		next(error);
+	}
+};

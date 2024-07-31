@@ -211,6 +211,36 @@ class History {
 		const [rows] = await pool.query(sql, params);
 		return rows;
 	}
+
+	//fetch products dispose history
+	static async fetchDisposeHistory(user_id, criteria) {
+		let sql = `SELECT 
+					DP.*,
+					DATE(DP.dispose_datetime) AS dispose_date,
+					JSON_ARRAYAGG(JSON_OBJECT('product_id', DI.product_id, 'product_name', S.product_name, 'quantity', DI.quantity, 'unit_cost', DI.unit_cost)) items
+				FROM dispose_products DP
+				INNER JOIN dispose_products_items DI ON DP.dispose_id = DI.dispose_id
+				INNER JOIN products S ON S.product_id = DI.product_id
+				WHERE DP.is_deleted = 0 AND DP.user_id = ?`;
+		const params = [user_id];
+		if (criteria.invoice_number) {
+			sql += ` AND DP.invoice_number = ?`;
+			params.push(criteria.invoice_number);
+		}
+		if (criteria.dispose_date) {
+			sql += ` AND DATE(DP.dispose_datetime) = ?`;
+			params.push(moment(criteria.dispose_date).format("yyyy-MM-DD"));
+		}
+
+		sql += ` GROUP BY Dp.dispose_id 
+		ORDER BY dispose_date DESC, DP.invoice_number DESC
+			LIMIT ? OFFSET ?`;
+		params.push(criteria.limit || 100);
+		params.push(criteria.offset || 0);
+
+		const [rows] = await pool.query(sql, params);
+		return rows;
+	}
 }
 
 module.exports = History;

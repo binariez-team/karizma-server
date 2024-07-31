@@ -189,7 +189,7 @@ class ReturnModel {
 
 			// add deleted items to inventory transactions
 			await connection.query(
-				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'SALE', quantity FROM return_order_items WHERE order_id = ?`,
+				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', quantity FROM return_order_items WHERE order_id = ?`,
 				[user_id, order_id]
 			);
 			//add order_items to inventory transactions
@@ -322,7 +322,7 @@ class ReturnModel {
 
 			// add deleted items to inventory transactions
 			await connection.query(
-				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'SALE', quantity FROM return_order_items WHERE order_id = ?`,
+				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', quantity FROM return_order_items WHERE order_id = ?`,
 				[user_id, order_id]
 			);
 

@@ -14,5 +14,6 @@ router.post(
 	"/suppliers-payment/search",
 	HistoryController.fetchSuppliersPaymentHistory
 );
+router.post("/dispose/search", HistoryController.fetchDisposeHistory);
 
 module.exports = router;
