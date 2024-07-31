@@ -232,7 +232,7 @@ class History {
 			params.push(moment(criteria.dispose_date).format("yyyy-MM-DD"));
 		}
 
-		sql += ` GROUP BY Dp.dispose_id 
+		sql += ` GROUP BY DP.dispose_id 
 		ORDER BY dispose_date DESC, DP.invoice_number DESC
 			LIMIT ? OFFSET ?`;
 		params.push(criteria.limit || 100);
