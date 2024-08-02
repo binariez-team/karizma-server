@@ -26,6 +26,8 @@ class Product {
 
 			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDISPOSE'), 0)
 
+			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDELIVER'), 0)
+
 
 
 			AS quantity
@@ -37,7 +39,17 @@ class Product {
 			AND user_id_fk = ?
             ORDER BY P.product_id ASC`;
 
-		const [result] = await pool.query(query, [id, id, id, id, id, id, id, id]);
+		const [result] = await pool.query(query, [
+			id,
+			id,
+			id,
+			id,
+			id,
+			id,
+			id,
+			id,
+			id,
+		]);
 		return result;
 	}
 

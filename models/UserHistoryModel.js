@@ -69,7 +69,7 @@ class UserHistory {
 			//	********************************
 
 			let [items] = await connection.query(
-				`SELECT * FROM deliver_order_items WHERE order_id_fk = ?`,
+				`SELECT * FROM deliver_order_items WHERE order_id_fk = ? and is_deleted = 0`,
 				id
 			);
 			for (const record of items) {
@@ -86,11 +86,7 @@ class UserHistory {
 						`SELECT * FROM inventory WHERE user_id_fk = ? AND product_id_fk = ?;`,
 						[admin_id, record.product_id]
 					);
-					let {
-						grandwhole_price_usd,
-						whole_price_usd,
-						unit_price_usd,
-					} = rows;
+					let { grandwhole_price_usd, whole_price_usd, unit_price_usd } = rows;
 					const inventoryRecord = {
 						product_id_fk: record.product_id,
 						user_id_fk: user_id,
