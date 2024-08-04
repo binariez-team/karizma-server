@@ -7,4 +7,9 @@ router.get("/deliver/pending", UserHistoryController.fetchPendingInvoices);
 router.post("/deliver/search", UserHistoryController.fetchDeliverHistory);
 router.put("/deliver/approve", UserHistoryController.approvePendingInvoice);
 
+router.post(
+	"/money-transfer/search",
+	UserHistoryController.fetchUserMoneyTransferHistory
+);
+
 module.exports = router;
