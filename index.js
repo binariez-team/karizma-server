@@ -74,6 +74,17 @@ app.get("/", (req, res) => {
 	res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+app.get("/print", (req, res) => {
+	res.json({
+		0: {
+			type: 0,
+			content: "Hello world",
+			bold: 1,
+			align: 2,
+			format: 3,
+		},
+	});
+});
 // handle errors
 app.use(errorHandler);
 
