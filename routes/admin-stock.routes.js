@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 
 const AdminStockController = require("../controllers/AdminStockController");
+const CategoryController = require("../controllers/CategoryController");
 
 router.get("/items", AdminStockController.getAllProducts);
 router.post("/items", AdminStockController.createProduct);
