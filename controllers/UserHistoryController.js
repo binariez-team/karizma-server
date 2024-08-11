@@ -39,7 +39,10 @@ exports.approvePendingInvoice = async (req, res, next) => {
 		const [user] = await User.getById(user_id);
 
 		// this is to inform admin that user approved invoice
-		io.emit("deliverCompleted", user.username);
+		io.emit("deliverCompleted", {
+			user: user.first_name,
+			id: id,
+		});
 		res.status(200).send(invoices);
 	} catch (error) {
 		next(error);
