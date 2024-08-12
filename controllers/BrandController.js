@@ -22,17 +22,6 @@ exports.createBrand = async (req, res, next) => {
 	}
 };
 
-exports.sortCategories = async (req, res, next) => {
-	let categories = req.body;
-	try {
-		await Brand.sort(categories);
-		let updatedCategories = await Brand.getAll();
-		res.status(201).send(updatedCategories);
-	} catch (error) {
-		next(error);
-	}
-};
-
 // update Brand
 exports.updateBrand = async (req, res, next) => {
 	let brand = req.body;
