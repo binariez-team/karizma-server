@@ -3,74 +3,134 @@ const moment = require("moment-timezone");
 
 class UserProduct {
 	static async getAll(user_id) {
+		// const query = `SELECT
+		//     C.category_name,
+		// 	B.brand_name,
+		//     P.*,
+		// 	I.grandwhole_price_usd,
+		//     I.whole_price_usd,
+		//     I.unit_price_usd,
+
+		//     IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELIVER' ), 0)
+		// 	+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELETE' ), 0)
+		// 	+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'RETURN'), 0)
+		// 	- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSERETURN'), 0)
+		// 	- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'SALE'), 0)
+		// 	- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DISPOSE'), 0)
+		// 	+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDISPOSE'), 0)
+
+		// 	AS quantity
+		//     FROM products P
+		// 	INNER JOIN inventory I ON P.product_id = I.product_id_fk
+		//     LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
+		// 	LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
+		//     WHERE P.is_deleted = 0 AND user_id_fk = ?
+		//     ORDER BY P.product_id ASC;`;
+
 		const query = `SELECT
-            C.category_name,
-			B.brand_name,
-            P.*,
-			I.grandwhole_price_usd,
-            I.whole_price_usd,
-            I.unit_price_usd,
-
-            IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELIVER' ), 0) 
-			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELETE' ), 0)
-			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'RETURN'), 0)
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSERETURN'), 0)
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'SALE'), 0)
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DISPOSE'), 0)
-			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDISPOSE'), 0)
-
-			AS quantity
-            FROM products P
-			INNER JOIN inventory I ON P.product_id = I.product_id_fk
-            LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
-			LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
-            WHERE P.is_deleted = 0 AND user_id_fk = ?
-            ORDER BY P.product_id ASC;`;
+					C.category_name,
+					B.brand_name,
+					P.product_id,
+					P.product_name,
+					I.grandwhole_price_usd,
+					I.whole_price_usd,
+					I.unit_price_usd,
+					COALESCE(t.quantity, 0) AS quantity
+				FROM products P
+				INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.user_id_fk = ?
+				LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
+				LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
+				LEFT JOIN (
+					SELECT
+						product_id_fk,
+						SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'REVERSERETURN' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) AS quantity
+					FROM inventory_transactions
+					WHERE user_id_fk = ?
+					GROUP BY product_id_fk
+				) t ON P.product_id = t.product_id_fk
+				WHERE P.is_deleted = 0
+				ORDER BY P.product_id ASC;`;
 
 		const [result] = await pool.query(query, [
 			user_id,
 			user_id,
-			user_id,
-			user_id,
-			user_id,
-			user_id,
-			user_id,
-			user_id,
+			// user_id,
+			// user_id,
+			// user_id,
+			// user_id,
+			// user_id,
+			// user_id,
 		]);
 		return result;
 	}
 
 	static async getById(user_id, product_id) {
+		// const query = `SELECT
+		//     C.category_name,
+		// 	B.brand_name,
+		//     P.*,
+		// 	I.grandwhole_price_usd,
+		//     I.whole_price_usd,
+		//     I.unit_price_usd,
+
+		//     IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELIVER' ), 0)
+		// 	+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELETE' ), 0)
+		// 	+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'RETURN'), 0)
+		// 	- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSERETURN'), 0)
+		// 	- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'SALE'), 0)
+		// 	- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DISPOSE'), 0)
+		// 	+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDISPOSE'), 0)
+
+		// 	AS quantity
+		// 	FROM products P
+		// 	INNER JOIN inventory I ON P.product_id = I.product_id_fk
+		// 	LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
+		// 	LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
+		// 	WHERE P.is_deleted = 0 AND user_id_fk = ? AND P.product_id = ?;`;
+
 		const query = `SELECT
-            C.category_name,
-      		B.brand_name,
-            P.*,
-      		I.grandwhole_price_usd,
-            I.whole_price_usd,
-            I.unit_price_usd,
-			
-            IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELIVER' ), 0)
-      		+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DELETE' ), 0)
-			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'RETURN'), 0)
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSERETURN'), 0)
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'SALE'), 0)
-			- IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'DISPOSE'), 0)
-			+ IFNULL((SELECT SUM(quantity) FROM inventory_transactions WHERE product_id_fk = P.product_id  AND user_id_fk = ? AND transaction_type = 'REVERSEDISPOSE'), 0)
-			
-			AS quantity
-			FROM products P
-			INNER JOIN inventory I ON P.product_id = I.product_id_fk
-			LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
-			LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
-			WHERE P.is_deleted = 0 AND user_id_fk = ? AND P.product_id = ?;`;
+					C.category_name,
+					B.brand_name,
+					P.product_id,
+					P.product_name,
+					I.grandwhole_price_usd,
+					I.whole_price_usd,
+					I.unit_price_usd,
+					COALESCE(t.quantity, 0) AS quantity
+				FROM products P
+				INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.user_id_fk = ?
+				LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
+				LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
+				LEFT JOIN (
+					SELECT
+						product_id_fk,
+						SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'REVERSERETURN' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) AS quantity
+					FROM inventory_transactions
+					WHERE user_id_fk = ? AND product_id_fk = ?
+					GROUP BY product_id_fk
+				) t ON P.product_id = t.product_id_fk
+				WHERE P.is_deleted = 0
+				ORDER BY P.product_id ASC;`;
 
 		const [result] = await pool.query(query, [
-			user_id,
-			user_id,
-			user_id,
-			user_id,
-			user_id,
-			user_id,
+			// user_id,
+			// user_id,
+			// user_id,
+			// user_id,
+			// user_id,
+			// user_id,
 			user_id,
 			user_id,
 			product_id,
