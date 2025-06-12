@@ -1,7 +1,12 @@
 const pool = require("../config/database");
 
 class Accounts {
-	static async getAccountDetailsById(user_id, account_id, startDate, endDate) {
+	static async getAccountDetailsById(
+		user_id,
+		account_id,
+		startDate,
+		endDate
+	) {
 		let query = `
     WITH partner_balance AS (
         SELECT

@@ -74,7 +74,10 @@ class BalanceModel {
 				exchange_value: paymentData.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			const secondItem = {
 				journal_id_fk: journal_voucher.insertId,
@@ -88,7 +91,10 @@ class BalanceModel {
 				credit: 0,
 				exchange_value: paymentData.exchange_rate,
 			};
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 
 			await connection.commit();
 		} catch (error) {
