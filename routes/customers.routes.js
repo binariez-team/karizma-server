@@ -4,33 +4,27 @@ const { admin } = require("../middleware/auth");
 
 const CustomersController = require("../controllers/CustomersController");
 
-router.get("/user", CustomersController.getCustomersByUserId);
-router.get(
-	"/user/:account_id",
-
-	CustomersController.getCustomerByIdAndUserId
-);
-router.post("/user", CustomersController.createUserCustomer);
-router.put("/user/:account_id", CustomersController.updateUserCustomer);
+router.get("/debts", CustomersController.getCustomerDebts);
+router.get("/", CustomersController.getCustomersByUserId);
+router.get("/:account_id", CustomersController.getCustomerByIdAndUserId);
+router.post("/", CustomersController.createUserCustomer);
+router.put("/:account_id", CustomersController.updateUserCustomer);
 router.delete(
-	"/user/:account_id",
+	"/:account_id",
 
 	CustomersController.deleteUserCustomer
 );
 
 router.get(
-	"/user/transactions/:account_id&:start&:end",
+	"/transactions/:account_id&:start&:end",
 	CustomersController.getCustomerBalance
 );
 
 router.get(
-	"/user/:account_id/purchases/latest",
+	"/:account_id/purchases/latest",
 	CustomersController.getCustomerLatestPurchases
 );
-router.get(
-	"/user/:account_id/balance",
-	CustomersController.getCustomerTotalBalance
-);
+router.get("/:account_id/balance", CustomersController.getCustomerTotalBalance);
 
 //admin routes
 router.use(admin);

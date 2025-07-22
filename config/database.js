@@ -54,7 +54,7 @@ if (process.env.NODE_ENV === "production") {
 		host: "localhost",
 		user: "root",
 		password: "roottoor",
-		database: "karizma",
+		database: "karizma-new",
 		multipleStatements: true,
 		dateStrings: true,
 	});

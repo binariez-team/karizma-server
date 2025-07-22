@@ -20,14 +20,13 @@ class ReturnModel {
 			order.invoice_number = `RET${number.toString().padStart(4, "0")}`;
 
 			//insert transactions to new journal_items approch
-			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_number,journal_description, total_value, exchange_value) VALUES (?, ?, ?, ?, ?, ?)`;
+			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_number,journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
 				user_id,
 				order.order_datetime,
 				order.invoice_number,
 				"Return",
 				order.total_amount,
-				order.exchange_rate,
 			]);
 			order.journal_voucher_id = journal_voucher.insertId;
 
@@ -39,13 +38,15 @@ class ReturnModel {
 				account_id_fk: _4111.id,
 				reference_number: order.reference_number,
 				partner_id_fk: order.customer_id,
-				currency: "USD",
+
 				debit: 0,
 				credit: order.total_amount,
-				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
@@ -54,13 +55,14 @@ class ReturnModel {
 				account_id_fk: _7011.id,
 				reference_number: order.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
 				debit: order.total_amount,
 				credit: 0,
-				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 
 			//add user_id to order
 			order.user_id = user_id;
@@ -136,13 +138,15 @@ class ReturnModel {
 					user_id: user_id,
 					reference_number: payment.reference_number,
 					partner_id_fk: payment.customer_id,
-					currency: "USD",
+
 					debit: 0,
 					credit: payment.amount,
-					exchange_value: payment.exchange_rate,
 				};
 
-				await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					firstItem
+				);
 
 				let [_413] = await Accounts.getIdByAccountNumber("413");
 				const secondItem = {
@@ -151,12 +155,14 @@ class ReturnModel {
 					account_id_fk: _413.id,
 					reference_number: payment.reference_number,
 					partner_id_fk: null,
-					currency: "USD",
+
 					debit: payment.amount,
 					credit: 0,
-					exchange_value: payment.exchange_rate,
 				};
-				await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					secondItem
+				);
 			}
 
 			await connection.commit();
@@ -203,7 +209,10 @@ class ReturnModel {
 
 			//delete voucher and items
 			let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
-			await connection.query(deleteVoucherQuery, orderCheck.journal_voucher_id);
+			await connection.query(
+				deleteVoucherQuery,
+				orderCheck.journal_voucher_id
+			);
 
 			let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
 			await connection.query(
@@ -227,17 +236,19 @@ class ReturnModel {
 			);
 
 			// fix invoice number
-			order.invoice_number = `RET${order.invoice_number.padStart(4, "0")}`;
+			order.invoice_number = `RET${order.invoice_number.padStart(
+				4,
+				"0"
+			)}`;
 
 			//insert transactions to new journal_items approch
-			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_number,journal_description, total_value, exchange_value) VALUES (?, ?, ?, ?, ?, ?)`;
+			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_number,journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
 				user_id,
 				order.order_datetime,
 				order.invoice_number,
 				"Return",
 				order.total_amount,
-				order.exchange_rate,
 			]);
 			order.journal_voucher_id = journal_voucher.insertId;
 
@@ -249,13 +260,15 @@ class ReturnModel {
 				account_id_fk: _4111.id,
 				reference_number: order.reference_number,
 				partner_id_fk: order.customer_id,
-				currency: "USD",
+
 				debit: 0,
 				credit: order.total_amount,
-				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
@@ -264,13 +277,15 @@ class ReturnModel {
 				account_id_fk: _7011.id,
 				reference_number: order.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
+
 				debit: order.total_amount,
 				credit: 0,
-				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 
 			//add user_id to order
 			order.user_id = user_id;
@@ -328,7 +343,10 @@ class ReturnModel {
 
 			//delete voucher and items
 			let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
-			await connection.query(deleteVoucherQuery, orderCheck.journal_voucher_id);
+			await connection.query(
+				deleteVoucherQuery,
+				orderCheck.journal_voucher_id
+			);
 
 			let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
 			await connection.query(

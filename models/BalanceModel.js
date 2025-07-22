@@ -3,14 +3,30 @@ const Account = require("./AccountsModel");
 const moment = require("moment-timezone");
 
 class BalanceModel {
+	// get balance
+	static async getBalance(user_id) {
+		const [_531] = await Account.getIdByAccountNumber("531");
+		const query = `SELECT COALESCE(sum(debit) - sum(credit),0) AS balance
+        FROM journal_items ji
+        where ji.is_deleted = 0
+        AND ji.account_id_fk = ?
+		AND ji.user_id = ?`;
+
+		const [[rows]] = await pool.query(query, [_531.id, user_id]);
+		console.log(rows);
+
+		return rows;
+	}
+
 	static async getBalanceByUserId(userId) {
 		const [_531] = await Account.getIdByAccountNumber("531");
 		const query = `SELECT COALESCE(sum(credit) - sum(debit),0) AS balance 
         FROM journal_items ji
-        where ji.is_deleted =0
-        AND ji.account_id_fk= ?
+        where ji.is_deleted = 0
+        AND ji.account_id_fk = ?
         AND ji.user_id = ?;`;
 		const [[rows]] = await pool.query(query, [_531.id, userId]);
+		console.log(rows);
 		return rows;
 	}
 
@@ -68,10 +84,8 @@ class BalanceModel {
 				user_id: admin_account.user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
 				debit: 0,
 				credit: paymentData.amount,
-				exchange_value: paymentData.exchange_rate,
 			};
 
 			await connection.query(
@@ -86,10 +100,8 @@ class BalanceModel {
 				user_id: user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: paymentData.customer_id,
-				currency: "USD",
 				debit: paymentData.amount,
 				credit: 0,
-				exchange_value: paymentData.exchange_rate,
 			};
 			await connection.query(
 				`INSERT INTO journal_items SET ?`,
@@ -168,7 +180,6 @@ class BalanceModel {
 				[journal_id, user_id]
 			);
 			journal_items = journal_items.map((item) => item.journal_item_id);
-			console.log(journal_items);
 
 			await connection.query(
 				`UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,

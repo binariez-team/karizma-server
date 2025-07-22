@@ -4,6 +4,7 @@ const { admin } = require("../middleware/auth");
 
 const BalanceController = require("../controllers/BalanceController");
 
+router.get("/", BalanceController.getBalance);
 router.get("/user", BalanceController.getBalanceByUserId);
 router.get("/all", admin, BalanceController.getAllUsersBalance);
 

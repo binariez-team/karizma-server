@@ -1,5 +1,4 @@
 const Product = require("../models/AdminStockModel");
-const UserProduct = require("../models/UserStockModel");
 
 exports.getAllProducts = async (req, res, next) => {
 	let user = req.user;
@@ -18,7 +17,10 @@ exports.createProduct = async (req, res, next) => {
 	delete data.product_id;
 	try {
 		const result = await Product.create(data, user);
-		const [createdProduct] = await Product.getById(result.insertId);
+		const [createdProduct] = await Product.getById(
+			result.insertId,
+			user.user_id
+		);
 		io.emit("productAdded", createdProduct.product_name);
 		res.status(201).send(createdProduct);
 	} catch (error) {
@@ -32,7 +34,10 @@ exports.updateProduct = async (req, res, next) => {
 	const user = req.user;
 	try {
 		await Product.update(product, user);
-		const [updatedProduct] = await Product.getById(product.product_id);
+		const [updatedProduct] = await Product.getById(
+			product.product_id,
+			user.user_id
+		);
 
 		// socket to push update
 		io.emit("productUpdated");
@@ -50,6 +55,30 @@ exports.deleteProduct = async (req, res, next) => {
 		res.status(202).json({
 			message: "Item has been deleted successfully!",
 		});
+	} catch (error) {
+		next(error);
+	}
+};
+
+exports.addStockCorrection = async (req, res, next) => {
+	try {
+		const io = req.io;
+		const user = req.user;
+		const data = req.body;
+
+		data.user_id_fk = user.user_id;
+		await Product.updateStock(data);
+
+		// fetch updated product
+		const [updatedProduct] = await Product.getById(
+			data.product_id_fk,
+			user.user_id
+		);
+		console.log(updatedProduct);
+
+		// io.emit("productUpdated", [updatedProduct, user]);
+
+		res.status(201).send(updatedProduct);
 	} catch (error) {
 		next(error);
 	}

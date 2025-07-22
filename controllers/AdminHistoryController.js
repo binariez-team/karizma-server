@@ -21,6 +21,17 @@ exports.fetchMoneyTransferHistory = async (req, res, next) => {
 	}
 };
 
+// purchases
+exports.fetchPurchaseHistory = async (req, res, next) => {
+	try {
+		const criteria = req.body;
+		let supplies = await AdminHistory.fetchPurchaseHistory(criteria);
+		res.status(200).send(supplies);
+	} catch (error) {
+		next(error);
+	}
+};
+
 exports.fetchSuppliersPaymentHistory = async (req, res, next) => {
 	try {
 		const user_id = req.user.user_id;

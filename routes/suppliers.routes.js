@@ -15,4 +15,6 @@ router.get(
 	SuppliersController.getSupplierBalance
 );
 
+router.get("/:id/balance", SuppliersController.getSupplierTotalBalance);
+
 module.exports = router;

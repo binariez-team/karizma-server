@@ -8,6 +8,8 @@ router.post(
 	"/money-transfer/search",
 	AdminHistoryController.fetchMoneyTransferHistory
 );
+
+router.post("/purchase/search", AdminHistoryController.fetchPurchaseHistory);
 router.post(
 	"/suppliers-payment/search",
 	AdminHistoryController.fetchSuppliersPaymentHistory

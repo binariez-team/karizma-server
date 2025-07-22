@@ -4,6 +4,7 @@ const Accounts = require("./AccountsModel");
 const moment = require("moment-timezone");
 
 class SellOrders {
+	// add order
 	static async addOrder(order, items, user_id, payment) {
 		const connection = await pool.getConnection();
 		try {
@@ -15,13 +16,12 @@ class SellOrders {
 			);
 
 			//insert transactions to new journal_items approch
-			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_description, total_value, exchange_value) VALUES (?, ?, ?, ?, ?)`;
+			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
 				user_id,
 				order.order_datetime,
 				"Invoice",
 				order.total_amount,
-				order.exchange_rate,
 			]);
 			order.journal_voucher_id = journal_voucher.insertId;
 
@@ -31,15 +31,17 @@ class SellOrders {
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _4111.id,
-				reference_number: order.reference_number,
 				partner_id_fk: order.customer_id,
-				currency: "USD",
+				reference_number: order.reference_number,
 				debit: order.total_amount,
 				credit: 0,
-				exchange_value: order.exchange_rate,
+				user_id: user_id,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
@@ -48,28 +50,31 @@ class SellOrders {
 				account_id_fk: _7011.id,
 				reference_number: order.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
 				debit: 0,
 				credit: order.total_amount,
-				exchange_value: order.exchange_rate,
+				user_id: user_id,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
-			if (order.vat_value > 0) {
-				let [_44271] = await Accounts.getIdByAccountNumber("44271");
-				const thirdItem = {
-					journal_id_fk: journal_voucher.insertId,
-					journal_date: order.order_datetime,
-					account_id_fk: _44271.id,
-					reference_number: order.reference_number,
-					partner_id_fk: null,
-					currency: "USD",
-					debit: 0,
-					credit: order.vat_value,
-					exchange_value: order.exchange_rate,
-				};
-				await connection.query(`INSERT INTO journal_items SET ?`, thirdItem);
-			}
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
+			// if (order.vat_value > 0) {
+			// 	let [_44271] = await Accounts.getIdByAccountNumber("44271");
+			// 	const thirdItem = {
+			// 		journal_id_fk: journal_voucher.insertId,
+			// 		journal_date: order.order_datetime,
+			// 		account_id_fk: _44271.id,
+			// 		reference_number: order.reference_number,
+			// 		partner_id_fk: null,
+			// 		debit: 0,
+			// 		credit: order.vat_value,
+			// 	};
+			// 	await connection.query(
+			// 		`INSERT INTO journal_items SET ?`,
+			// 		thirdItem
+			// 	);
+			// }
 
 			const [result] = await connection.query(
 				`INSERT INTO sales_orders SET ?`,
@@ -124,7 +129,7 @@ class SellOrders {
 					quantity = element["quantity"];
 					params = params.concat([product_id, user_id, quantity]);
 					//add order_items to inventory transactions
-					queries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (?,?,?, 'SALE');`;
+					queries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (?, ?, -?, 'SALE');`;
 				});
 				await connection.query(queries, params);
 			}
@@ -159,13 +164,14 @@ class SellOrders {
 					user_id: user_id,
 					reference_number: payment.reference_number,
 					partner_id_fk: payment.customer_id,
-					currency: "USD",
 					debit: 0,
 					credit: payment.amount,
-					exchange_value: payment.exchange_rate,
 				};
 
-				await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					firstItem
+				);
 
 				let [_413] = await Accounts.getIdByAccountNumber("413");
 				const secondItem = {
@@ -174,12 +180,14 @@ class SellOrders {
 					account_id_fk: _413.id,
 					reference_number: payment.reference_number,
 					partner_id_fk: null,
-					currency: "USD",
+
 					debit: payment.amount,
 					credit: 0,
-					exchange_value: payment.exchange_rate,
 				};
-				await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					secondItem
+				);
 			}
 
 			await connection.commit();
@@ -191,6 +199,8 @@ class SellOrders {
 			connection.release();
 		}
 	}
+
+	// edit order
 	static async editOrder(order, items, user_id) {
 		const connection = await pool.getConnection();
 		try {
@@ -220,13 +230,16 @@ class SellOrders {
 				product_id = element.product_id;
 				quantity = element.quantity;
 				// update inventory
-				inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) VALUES (${product_id}, ${user_id}, 'SALE', ${quantity});`;
+				inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) VALUES (${product_id}, ${user_id}, 'SALE', ${-quantity});`;
 			});
 			await connection.query(inventoryQueries);
 
 			//delete voucher and items
 			let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
-			await connection.query(deleteVoucherQuery, orderCheck.journal_voucher_id);
+			await connection.query(
+				deleteVoucherQuery,
+				orderCheck.journal_voucher_id
+			);
 
 			let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
 			await connection.query(
@@ -250,10 +263,13 @@ class SellOrders {
 			);
 
 			// fix invoice number
-			order.invoice_number = `INV${order.invoice_number.padStart(4, "0")}`;
+			order.invoice_number = `INV${order.invoice_number.padStart(
+				4,
+				"0"
+			)}`;
 
 			//insert to vouchers and journal_items
-			let query = `INSERT INTO journal_vouchers (journal_id, user_id, journal_number, journal_date, journal_description, total_value, exchange_value) VALUES (?, ?, ?, ?, ?, ?, ?)`;
+			let query = `INSERT INTO journal_vouchers (journal_id, user_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
 				orderCheck.journal_voucher_id,
 				user_id,
@@ -261,7 +277,6 @@ class SellOrders {
 				order.order_datetime,
 				"Invoice",
 				order.total_amount,
-				order.exchange_rate,
 			]);
 			order.journal_voucher_id = journal_voucher.insertId;
 
@@ -273,13 +288,14 @@ class SellOrders {
 				account_id_fk: _4111.id,
 				reference_number: order.reference_number,
 				partner_id_fk: order.customer_id,
-				currency: "USD",
 				debit: order.total_amount,
 				credit: 0,
-				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
@@ -288,13 +304,15 @@ class SellOrders {
 				account_id_fk: _7011.id,
 				reference_number: order.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
+
 				debit: 0,
 				credit: order.total_amount,
-				exchange_value: order.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 			if (order.vat_value > 0) {
 				let [_44271] = await Accounts.getIdByAccountNumber("44271");
 				const thirdItem = {
@@ -303,12 +321,14 @@ class SellOrders {
 					account_id_fk: _44271.id,
 					reference_number: order.reference_number,
 					partner_id_fk: null,
-					currency: "USD",
+
 					debit: 0,
 					credit: order.vat_value,
-					exchange_value: order.exchange_rate,
 				};
-				await connection.query(`INSERT INTO journal_items SET ?`, thirdItem);
+				await connection.query(
+					`INSERT INTO journal_items SET ?`,
+					thirdItem
+				);
 			}
 
 			//add user_id to order
@@ -369,7 +389,10 @@ class SellOrders {
 
 			//delete voucher and items
 			let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
-			await connection.query(deleteVoucherQuery, orderCheck.journal_voucher_id);
+			await connection.query(
+				deleteVoucherQuery,
+				orderCheck.journal_voucher_id
+			);
 
 			let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
 			await connection.query(
@@ -393,6 +416,8 @@ class SellOrders {
 			connection.release();
 		}
 	}
+
+	// get added order by id
 	static async getAddedOrderById(order_id, user_id) {
 		const [order] = await pool.query(
 			`SELECT * FROM sales_orders WHERE order_id = ? AND user_id = ?`,

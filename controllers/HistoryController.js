@@ -1,5 +1,32 @@
 const History = require("../models/HistoryModel");
 
+// product history
+exports.getProductHistoryById = async (req, res, next) => {
+	try {
+		const product_id = req.params.id;
+		const user_id = req.user.user_id;
+		const history = await History.getProductHistoryById(
+			product_id,
+			user_id
+		);
+		res.status(200).send(history);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// fetch order items by order id
+exports.fetchOrderItemsById = async (req, res, next) => {
+	try {
+		let ids = req.body;
+		let results = await History.fetchOrderItemsById(ids);
+		res.status(200).send(results);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// sales
 exports.fetchSalesHistory = async (req, res, next) => {
 	try {
 		const user_id = req.user.user_id;

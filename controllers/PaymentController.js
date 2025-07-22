@@ -10,6 +10,7 @@ exports.addCustomerPayment = async (req, res, next) => {
 		next(error);
 	}
 };
+
 exports.editCustomerPayment = async (req, res, next) => {
 	try {
 		const user_id = req.user.user_id;
@@ -36,7 +37,6 @@ exports.addSupplierPayment = async (req, res, next) => {
 	try {
 		const user_id = req.user.user_id;
 		const paymentData = req.body;
-		console.log(paymentData, user_id);
 		const result = await Payment.addSupplierPayment(user_id, paymentData);
 		res.status(200).json(result);
 	} catch (error) {

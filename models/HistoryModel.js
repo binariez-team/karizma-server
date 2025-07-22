@@ -1,7 +1,31 @@
 const pool = require("../config/database");
-const moment = require("moment");
+const moment = require("moment-timezone");
 
 class History {
+	// get product history
+	static async getProductHistoryById(product_id, user_id) {
+		const query = `SELECT * FROM inventory_transactions
+		WHERE product_id_fk = ?
+		AND user_id_fk = ?
+		AND is_deleted = 0
+		ORDER BY transaction_datetime DESC LIMIT 100`;
+		let [rows] = await pool.query(query, [product_id, user_id]);
+		return rows;
+	}
+
+	// fetch order items by order id
+	static async fetchOrderItemsById(ids) {
+		let query = `SELECT
+            I.*,
+            P.product_name
+            FROM sales_order_items I
+            INNER JOIN products P ON I.product_id = P.product_id
+            WHERE I.is_deleted = 0
+            AND order_id IN (?)`;
+		let [results] = await pool.query(query, [ids]);
+		return results;
+	}
+
 	// fetch sales invoices
 	static async fetchSalesHistory(user_id, criteria) {
 		let sql = `SELECT

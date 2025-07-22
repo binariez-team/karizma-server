@@ -43,6 +43,124 @@ class Customer {
 		return result;
 	}
 
+	// get customers debts
+	static async getCustomerDebts(user_id) {
+		let query = `SELECT
+					a.account_id,
+					a.name,
+					a.phone,
+					COALESCE(SUM(ji.debit) - SUM(ji.credit), 0) AS balance
+				FROM
+					journal_items ji
+
+				LEFT JOIN journal_vouchers jv ON jv.journal_id = ji.journal_id_fk
+
+				INNER JOIN accounts a ON ji.partner_id_fk = a.account_id
+
+				WHERE
+					ji.is_deleted = 0
+				AND ji.user_id = ?
+                AND a.is_customer = 1
+				GROUP BY ji.partner_id_fk
+
+				HAVING balance != 0
+				ORDER BY balance DESC`;
+		const [result] = await pool.query(query, [user_id]);
+
+		return result;
+	}
+
+	// update customer debts
+	static async addManualDebt(data) {
+		const connection = await pool.getConnection();
+		try {
+			await connection.beginTransaction();
+
+			moment.tz.setDefault("Asia/Beirut");
+			data.transaction_datetime = moment(
+				data.transaction_datetime
+			).format(`YYYY-MM-DD HH:mm:ss`);
+
+			console.log(data);
+
+			// create journal voucher
+			let query = `INSERT INTO journal_vouchers (journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?)`;
+			const [journal_voucher] = await connection.query(query, [
+				data.transaction_datetime,
+				"Manual Transaction",
+				data.transaction_notes,
+				data.amount,
+			]);
+
+			let [_4111] = await Accounts.getIdByAccountNumber("4111");
+			const ordinaryClients = {
+				journal_id_fk: journal_voucher.insertId,
+				journal_date: data.transaction_datetime,
+				account_id_fk: _4111.id,
+				partner_id_fk: data.selected_account,
+				currency: "USD",
+				debit: 0,
+				credit: 0,
+				exchange_value: data.exchange_rate,
+			};
+
+			let capitalOrCash;
+			if (data.modifyCash) {
+				let [_531] = await Accounts.getIdByAccountNumber("531");
+				capitalOrCash = {
+					journal_id_fk: journal_voucher.insertId,
+					journal_date: data.transaction_datetime,
+					account_id_fk: _531.id,
+					reference_number: data.transaction_notes,
+					partner_id_fk: null,
+					currency: "USD",
+					debit: 0,
+					credit: 0,
+					exchange_value: data.exchange_rate,
+				};
+			} else {
+				let [_101] = await Accounts.getIdByAccountNumber("101");
+				capitalOrCash = {
+					journal_id_fk: journal_voucher.insertId,
+					journal_date: data.transaction_datetime,
+					account_id_fk: _101.id,
+					reference_number: data.reference_number,
+					partner_id_fk: null,
+					currency: "USD",
+					debit: 0,
+					credit: 0,
+					exchange_value: data.exchange_rate,
+				};
+			}
+
+			// debit or credit based on transaction type
+			if (data.transaction_type == "ADD") {
+				ordinaryClients.debit = data.amount;
+				capitalOrCash.credit = data.amount;
+			} else {
+				ordinaryClients.credit = data.amount;
+				capitalOrCash.debit = data.amount;
+			}
+
+			// add journal items
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				ordinaryClients
+			);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				capitalOrCash
+			);
+
+			await connection.commit();
+		} catch (error) {
+			await connection.rollback();
+			throw error;
+		} finally {
+			connection.release();
+		}
+	}
+
 	//////////////////////////////////
 	//customer model related to user//
 	//////////////////////////////////

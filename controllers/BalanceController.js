@@ -1,9 +1,20 @@
 const Balance = require("../models/BalanceModel");
 
 //get user balance
-exports.getBalanceByUserId = async (req, res, next) => {
-	const userId = req.user.user_id;
+exports.getBalance = async (req, res, next) => {
 	try {
+		const user_id = req.user.user_id;
+		const balance = await Balance.getBalance(user_id);
+		res.status(200).send(balance);
+	} catch (error) {
+		next(error);
+	}
+};
+
+//get user balance
+exports.getBalanceByUserId = async (req, res, next) => {
+	try {
+		const userId = req.user.user_id;
 		const balance = await Balance.getBalanceByUserId(userId);
 		res.status(200).json(balance);
 	} catch (error) {

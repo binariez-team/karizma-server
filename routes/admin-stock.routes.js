@@ -10,6 +10,8 @@ router.post("/items", AdminStockController.createProduct);
 router.put("/items", AdminStockController.updateProduct);
 router.delete("/items/:id", AdminStockController.deleteProduct);
 
+router.post("/correction", AdminStockController.addStockCorrection);
+
 router.get("/categories", CategoryController.getCategories);
 router.post("/categories", CategoryController.createCategory);
 router.put("/categories", CategoryController.updateCategory);

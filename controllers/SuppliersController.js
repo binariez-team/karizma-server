@@ -80,3 +80,15 @@ exports.getSupplierBalance = async (req, res, next) => {
 		next(error);
 	}
 };
+
+//get supplier total balance
+exports.getSupplierTotalBalance = async (req, res, next) => {
+	const user_id = req.user.user_id;
+	const { id } = req.params;
+	try {
+		const balance = await Supplier.getSupplierTotalBalance(id, user_id);
+		res.status(200).json({ id, ...balance });
+	} catch (error) {
+		next(error);
+	}
+};

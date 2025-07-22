@@ -41,14 +41,19 @@ class DeliverInvoice {
 				delete record.product_name;
 
 				// insert into order items
-				await connection.query(`INSERT INTO deliver_order_items SET ?`, {
-					...record,
-					order_id_fk: order_id,
-				});
+				await connection.query(
+					`INSERT INTO deliver_order_items SET ?`,
+					{
+						...record,
+						order_id_fk: order_id,
+					}
+				);
 
 				// add admin record to inventory transactions
 				await connection.query(
-					`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (${record.product_id}, ${order.admin_id_fk}, ${record.quantity}, 'DELIVER');`
+					`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (${
+						record.product_id
+					}, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER');`
 				);
 			}
 
@@ -61,6 +66,8 @@ class DeliverInvoice {
 			connection.release();
 		}
 	}
+
+	// update deliver
 	static async update(order, items, user) {
 		const connection = await pool.getConnection();
 		try {
@@ -110,14 +117,19 @@ class DeliverInvoice {
 				delete record.product_name;
 
 				// insert into order items
-				await connection.query(`INSERT INTO deliver_order_items SET ?`, {
-					...record,
-					order_id_fk: order.order_id,
-				});
+				await connection.query(
+					`INSERT INTO deliver_order_items SET ?`,
+					{
+						...record,
+						order_id_fk: order.order_id,
+					}
+				);
 
 				// add admin record to inventory transactions
 				await connection.query(
-					`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (${record.product_id}, ${order.admin_id_fk}, ${record.quantity}, 'DELIVER');`
+					`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (${
+						record.product_id
+					}, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER');`
 				);
 			}
 
@@ -151,13 +163,13 @@ class DeliverInvoice {
 
 			//delete invoice items
 			await connection.query(
-				`UPDATE deliver_order_items SET is_deleted=1 WHERE order_id_fk = ?`,
+				`UPDATE deliver_order_items SET is_deleted = 1 WHERE order_id_fk = ?`,
 				[order_id]
 			);
 
 			//delete invoice
 			await connection.query(
-				`UPDATE deliver_orders SET is_deleted=1 WHERE order_id = ?`,
+				`UPDATE deliver_orders SET is_deleted = 1 WHERE order_id = ?`,
 				[order_id]
 			);
 			await connection.commit();
