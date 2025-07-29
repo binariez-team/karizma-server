@@ -90,5 +90,7 @@ app.get("/print", (req, res) => {
 // handle errors
 app.use(errorHandler);
 
-// server.listen(3500, () => console.log(`listening on port 3500 ...`));
-module.exports = server;
+server.listen(process.env.PORT, () =>
+	console.log(`listening on port ${process.env.PORT} ...`)
+);
+// module.exports = server;
