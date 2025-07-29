@@ -59,22 +59,6 @@ class SellOrders {
 				`INSERT INTO journal_items SET ?`,
 				secondItem
 			);
-			// if (order.vat_value > 0) {
-			// 	let [_44271] = await Accounts.getIdByAccountNumber("44271");
-			// 	const thirdItem = {
-			// 		journal_id_fk: journal_voucher.insertId,
-			// 		journal_date: order.order_datetime,
-			// 		account_id_fk: _44271.id,
-			// 		reference_number: order.reference_number,
-			// 		partner_id_fk: null,
-			// 		debit: 0,
-			// 		credit: order.vat_value,
-			// 	};
-			// 	await connection.query(
-			// 		`INSERT INTO journal_items SET ?`,
-			// 		thirdItem
-			// 	);
-			// }
 
 			const [result] = await connection.query(
 				`INSERT INTO sales_orders SET ?`,
@@ -127,9 +111,15 @@ class SellOrders {
 				items.forEach((element) => {
 					product_id = element["product_id"];
 					quantity = element["quantity"];
-					params = params.concat([product_id, user_id, quantity]);
+					params = params.concat([
+						product_id,
+						user_id,
+						quantity,
+						order_id,
+						invoice_number,
+					]);
 					//add order_items to inventory transactions
-					queries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type) VALUES (?, ?, -?, 'SALE');`;
+					queries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, quantity, transaction_type, order_id_fk, transaction_notes) VALUES (?, ?, -?, 'SALE', ?, ?);`;
 				});
 				await connection.query(queries, params);
 			}
@@ -220,17 +210,20 @@ class SellOrders {
 			let product_id = null;
 			let quantity = null;
 
-			// add deleted items to inventory transactions
+			// delete items from inventory transactions
 			await connection.query(
-				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'DELETE', quantity FROM sales_order_items WHERE order_id = ?`,
-				[user_id, order_id]
+				`DELETE FROM inventory_transactions WHERE order_id_fk = ? AND transaction_type = 'SALE'`,
+				[order_id]
 			);
+
 			//add order_items to inventory transactions
 			items.forEach((element) => {
 				product_id = element.product_id;
 				quantity = element.quantity;
 				// update inventory
-				inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) VALUES (${product_id}, ${user_id}, 'SALE', ${-quantity});`;
+				inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity, order_id_fk, transaction_notes) VALUES (${product_id}, ${user_id}, 'SALE', ${-quantity}, ${order_id}, '${
+					orderCheck.invoice_number
+				}');`;
 			});
 			await connection.query(inventoryQueries);
 
@@ -313,23 +306,6 @@ class SellOrders {
 				`INSERT INTO journal_items SET ?`,
 				secondItem
 			);
-			if (order.vat_value > 0) {
-				let [_44271] = await Accounts.getIdByAccountNumber("44271");
-				const thirdItem = {
-					journal_id_fk: journal_voucher.insertId,
-					journal_date: order.order_datetime,
-					account_id_fk: _44271.id,
-					reference_number: order.reference_number,
-					partner_id_fk: null,
-
-					debit: 0,
-					credit: order.vat_value,
-				};
-				await connection.query(
-					`INSERT INTO journal_items SET ?`,
-					thirdItem
-				);
-			}
 
 			//add user_id to order
 			order.user_id = user_id;
@@ -383,7 +359,7 @@ class SellOrders {
 
 			// add deleted items to inventory transactions
 			await connection.query(
-				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'DELETE', quantity FROM sales_order_items WHERE order_id = ?`,
+				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity, transaction_notes) SELECT product_id, ?, 'DELETE', quantity, '${orderCheck.invoice_number}' FROM sales_order_items WHERE order_id = ?`,
 				[user_id, order_id]
 			);
 
@@ -401,11 +377,11 @@ class SellOrders {
 			);
 
 			// delete old items
-			let deleteItemsQuery = `DELETE FROM sales_order_items WHERE order_id = ?`;
+			let deleteItemsQuery = `UPDATE sales_order_items SET is_deleted = 1 WHERE order_id = ?`;
 			await connection.query(deleteItemsQuery, order_id);
 
 			// delete old invoice
-			let deleteOrderQuery = `DELETE FROM sales_orders WHERE order_id = ?`;
+			let deleteOrderQuery = `UPDATE sales_orders SET is_deleted = 1 WHERE order_id = ?`;
 			await connection.query(deleteOrderQuery, order_id);
 
 			await connection.commit();

@@ -13,7 +13,6 @@ class BalanceModel {
 		AND ji.user_id = ?`;
 
 		const [[rows]] = await pool.query(query, [_531.id, user_id]);
-		console.log(rows);
 
 		return rows;
 	}
@@ -26,7 +25,7 @@ class BalanceModel {
         AND ji.account_id_fk = ?
         AND ji.user_id = ?;`;
 		const [[rows]] = await pool.query(query, [_531.id, userId]);
-		console.log(rows);
+
 		return rows;
 	}
 

@@ -31,7 +31,7 @@ class Accounts {
 				'Initial Balance' AS journal_description,
 				COALESCE(pb.debit, 0) AS debit,
 				COALESCE(pb.credit, 0) AS credit,
-				NULL AS account_code,
+				
 				NULL AS account_name,
 				COALESCE(pb.debit, 0) - COALESCE(pb.credit, 0) AS balance
 			FROM
@@ -48,7 +48,7 @@ class Accounts {
 			jv.journal_description,
 			ji.debit,
 			ji.credit,
-			aa.code AS account_code,
+			
 			aa.name AS account_name,
 			NULL AS balance
 

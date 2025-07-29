@@ -77,7 +77,6 @@ class AdminHistory {
             A.name AS supplier_name,
             A.phone AS supplier_phone,
             A.address AS supplier_address,
-            A.financial_number,
             PO.*,
             DATE(PO.order_datetime) AS order_date,
             JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id_fk, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_cost', M.unit_cost_usd, 'unit_price', M.unit_cost_usd )) items

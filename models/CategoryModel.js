@@ -20,8 +20,6 @@ class Category {
 
 	// sort categories
 	static async sort(categories) {
-		console.log(categories);
-
 		let query = "";
 		categories.forEach((element) => {
 			query += `UPDATE products_categories SET category_index = ${categories.indexOf(

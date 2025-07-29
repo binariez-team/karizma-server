@@ -1,48 +1,6 @@
 const pool = require("../config/database");
 
 class Customer {
-	// get customers
-	static async getAllCustomers() {
-		const [result] = await pool.query(
-			"SELECT * FROM accounts WHERE is_customer = 1 AND is_deleted = 0"
-		);
-		return result;
-	}
-
-	// get customer by id
-	static async getCustomerById(id) {
-		const [[result]] = await pool.query(
-			"SELECT * FROM accounts WHERE account_id = ? AND is_customer = 1 AND is_deleted = 0",
-			[id]
-		);
-		return result;
-	}
-
-	// create customer
-	static async createCustomer(data) {
-		data.is_customer = 1;
-		const [result] = await pool.query("INSERT INTO accounts SET ?", data);
-		return result;
-	}
-
-	// update customer
-	static async updateCustomer(id, data) {
-		const [result] = await pool.query(
-			"UPDATE accounts SET ? WHERE account_id = ? AND is_customer = 1 AND is_deleted = 0",
-			[data, id]
-		);
-		return result;
-	}
-
-	// delete customer
-	static async deleteCustomer(id) {
-		const [result] = await pool.query(
-			"UPDATE accounts SET is_deleted = 1 WHERE account_id = ? AND is_customer = 1",
-			[id]
-		);
-		return result;
-	}
-
 	// get customers debts
 	static async getCustomerDebts(user_id) {
 		let query = `SELECT
@@ -80,8 +38,6 @@ class Customer {
 			data.transaction_datetime = moment(
 				data.transaction_datetime
 			).format(`YYYY-MM-DD HH:mm:ss`);
-
-			console.log(data);
 
 			// create journal voucher
 			let query = `INSERT INTO journal_vouchers (journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?)`;
@@ -192,10 +148,10 @@ class Customer {
 	}
 
 	//update a customer related to user
-	static async updateCustomerByUserId(user_id, account_id, data) {
+	static async updateCustomerByUserId(user_id, data) {
 		const [result] = await pool.query(
 			"UPDATE accounts SET ? WHERE account_id = ? AND user_id = ? AND is_customer = 1 AND is_deleted = 0",
-			[data, account_id, user_id]
+			[data, data.account_id, user_id]
 		);
 		return result;
 	}

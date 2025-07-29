@@ -22,13 +22,16 @@ class UserProduct {
 					SELECT
 						product_id_fk,
 						SUM(CASE WHEN transaction_type = 'ADD' THEN quantity ELSE 0 END) +
-						SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'REMOVE' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
-						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) -
-						SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) -
-						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'SUPPLY' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REVERSERETURN' THEN quantity ELSE 0 END) +
-						SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) AS quantity
+						SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'REVERSEDELIVER' THEN quantity ELSE 0 END) AS quantity
 					FROM inventory_transactions
 					WHERE user_id_fk = ?
 					GROUP BY product_id_fk
@@ -60,11 +63,13 @@ class UserProduct {
 					SELECT
 						product_id_fk,
 						SUM(CASE WHEN transaction_type = 'ADD' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'REMOVE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'SUPPLY' THEN quantity ELSE 0 END) +
-						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) -
-						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) -
-						SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) -
-						SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) -
+						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REVERSERETURN' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REVERSEDELIVER' THEN quantity ELSE 0 END) AS quantity

@@ -27,6 +27,7 @@ class Product {
 						product_id_fk,
 						SUM(CASE WHEN transaction_type = 'ADD' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REMOVE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'SUPPLY' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) +
@@ -70,6 +71,7 @@ class Product {
 						product_id_fk,
 						SUM(CASE WHEN transaction_type = 'ADD' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REMOVE' THEN quantity ELSE 0 END) +
+						SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'SUPPLY' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) +

@@ -144,7 +144,6 @@ class DeliverInvoice {
 	}
 
 	static async delete(order_id, admin_id) {
-		console.log(order_id, admin_id);
 		const connection = await pool.getConnection();
 		try {
 			await connection.beginTransaction();
