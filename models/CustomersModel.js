@@ -1,4 +1,6 @@
 const pool = require("../config/database");
+const Accounts = require("./AccountsModel");
+const moment = require("moment-timezone");
 
 class Customer {
 	// get customers debts
@@ -29,7 +31,7 @@ class Customer {
 	}
 
 	// update customer debts
-	static async addManualDebt(data) {
+	static async addManualDebt(data, user_id) {
 		const connection = await pool.getConnection();
 		try {
 			await connection.beginTransaction();
@@ -40,8 +42,9 @@ class Customer {
 			).format(`YYYY-MM-DD HH:mm:ss`);
 
 			// create journal voucher
-			let query = `INSERT INTO journal_vouchers (journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?)`;
+			let query = `INSERT INTO journal_vouchers (user_id, journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
+				user_id,
 				data.transaction_datetime,
 				"Manual Transaction",
 				data.transaction_notes,
@@ -54,10 +57,9 @@ class Customer {
 				journal_date: data.transaction_datetime,
 				account_id_fk: _4111.id,
 				partner_id_fk: data.selected_account,
-				currency: "USD",
+
 				debit: 0,
 				credit: 0,
-				exchange_value: data.exchange_rate,
 			};
 
 			let capitalOrCash;
@@ -69,10 +71,9 @@ class Customer {
 					account_id_fk: _531.id,
 					reference_number: data.transaction_notes,
 					partner_id_fk: null,
-					currency: "USD",
+
 					debit: 0,
 					credit: 0,
-					exchange_value: data.exchange_rate,
 				};
 			} else {
 				let [_101] = await Accounts.getIdByAccountNumber("101");
@@ -82,10 +83,9 @@ class Customer {
 					account_id_fk: _101.id,
 					reference_number: data.reference_number,
 					partner_id_fk: null,
-					currency: "USD",
+
 					debit: 0,
 					credit: 0,
-					exchange_value: data.exchange_rate,
 				};
 			}
 

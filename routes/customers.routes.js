@@ -6,6 +6,8 @@ const CustomersController = require("../controllers/CustomersController");
 
 router.get("/debts", CustomersController.getCustomerDebts);
 
+router.post("/debts", CustomersController.addManualDebt);
+
 router.get("/", CustomersController.getCustomersByUserId);
 router.get("/:account_id", CustomersController.getCustomerByIdAndUserId);
 
