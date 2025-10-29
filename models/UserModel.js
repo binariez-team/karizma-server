@@ -10,6 +10,14 @@ class User {
 		return rows;
 	}
 
+	static async getAllByUser(id) {
+		const [rows] = await pool.query(
+			`SELECT user_id, username, first_name, last_name, last_login FROM users WHERE user_type = 'user' AND is_deleted = 0 AND user_id != ?`,
+			[id]
+		);
+		return rows;
+	}
+
 	// get by id
 	static async getById(id) {
 		const [rows] = await pool.query(

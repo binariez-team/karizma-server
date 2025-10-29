@@ -64,12 +64,13 @@ app.use("/admin-stock", admin, AdminStockRoutes);
 app.use("/users", admin, UsersRoutes);
 app.use("/suppliers", admin, SuppliersRoutes);
 app.use("/purchase", admin, PurchaseRoutes);
-app.use("/deliver", admin, DeliverRoutes);
+app.use("/deliver", auth, DeliverRoutes);
 app.use("/admin-history", admin, AdminHistoryRoutes);
 
 // user routes
 app.use("/user-history", auth, UserHistoryRoutes);
 app.use("/user-stock", auth, UserStockRoutes);
+app.use("/user-deliver", auth, require("./routes/user-deliver.routes"));
 
 // check API status page
 app.get("/", (req, res) => {
