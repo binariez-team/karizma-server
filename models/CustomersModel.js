@@ -57,7 +57,7 @@ class Customer {
 				journal_date: data.transaction_datetime,
 				account_id_fk: _4111.id,
 				partner_id_fk: data.selected_account,
-
+				user_id: user_id,
 				debit: 0,
 				credit: 0,
 			};
@@ -71,7 +71,7 @@ class Customer {
 					account_id_fk: _531.id,
 					reference_number: data.transaction_notes,
 					partner_id_fk: null,
-
+					user_id: user_id,
 					debit: 0,
 					credit: 0,
 				};
@@ -83,7 +83,7 @@ class Customer {
 					account_id_fk: _101.id,
 					reference_number: data.reference_number,
 					partner_id_fk: null,
-
+					user_id: user_id,
 					debit: 0,
 					credit: 0,
 				};

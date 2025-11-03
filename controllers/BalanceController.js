@@ -78,3 +78,32 @@ exports.getTransferAccounts = async (req, res, next) => {
 		next(error);
 	}
 };
+
+// get cash transactions history
+exports.getCashTransactions = async (req, res, next) => {
+	try {
+		const { user_id } = req.user;
+		const { start, end } = req.params;
+		const results = await Balance.getCashTransactions(start, end, user_id);
+		res.status(200).send(results);
+	} catch (error) {
+		next(error);
+	}
+};
+
+// correct balance
+exports.correctBalance = async (req, res, next) => {
+	// try {
+	// 	const data = req.body;
+	// 	// const io = req.io;
+	// 	const user = req.user;
+	// 	await Balance.correctBalance(data, user.user_id);
+	// 	// emit socket
+	// 	// io.emit("cashBalanceUpdated", user);
+	// 	res.status(201).json({
+	// 		message: "Balance has been updated successfully!",
+	// 	});
+	// } catch (error) {
+	// 	next(error);
+	// }
+};

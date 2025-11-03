@@ -14,7 +14,6 @@ exports.fetchMoneyTransferHistory = async (req, res, next) => {
 	try {
 		let criteria = req.body;
 		let invoices = await AdminHistory.fetchMoneyTransferHistory(criteria);
-		console.log(invoices);
 		res.status(200).send(invoices);
 	} catch (error) {
 		next(error);

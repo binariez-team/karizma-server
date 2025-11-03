@@ -141,7 +141,7 @@ class SellOrders {
 					user_id,
 					payment_number,
 					payment.payment_date,
-					"Payment",
+					"Payment Received",
 					payment.amount,
 				]);
 

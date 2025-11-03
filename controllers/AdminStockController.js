@@ -62,7 +62,7 @@ exports.deleteProduct = async (req, res, next) => {
 
 exports.addStockCorrection = async (req, res, next) => {
 	try {
-		const io = req.io;
+		// const io = req.io;
 		const user = req.user;
 		const data = req.body;
 

@@ -8,6 +8,11 @@ router.get("/", BalanceController.getBalance);
 router.get("/user", BalanceController.getBalanceByUserId);
 router.get("/all", admin, BalanceController.getAllUsersBalance);
 
+// get cash transactions history
+router.get("/transactions/:start&:end", BalanceController.getCashTransactions);
+// correct cash balance manually
+router.post("/correct", BalanceController.correctBalance);
+
 //money transfer
 router.post("/transfer", BalanceController.transferMoney);
 router.put("/transfer", BalanceController.updateTransfer);

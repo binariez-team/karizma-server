@@ -206,6 +206,70 @@ class BalanceModel {
 		const [rows] = await pool.query(query, [user_id]);
 		return rows;
 	}
+
+	// get cash transaction history
+	static async getCashTransactions(start, end, user_id) {
+		const [_531] = await Account.getIdByAccountNumber("531");
+		let query = `WITH partner_balance AS (
+            SELECT
+                SUM(CASE WHEN ji.debit IS NOT NULL THEN ji.debit ELSE 0 END) AS debit,
+                SUM(CASE WHEN ji.credit IS NOT NULL THEN ji.credit ELSE 0 END) AS credit
+            FROM
+                journal_items ji
+            INNER JOIN
+                journal_vouchers jv ON ji.journal_id_fk = jv.journal_id
+            WHERE
+                ji.account_id_fk = ?
+                AND Date(jv.journal_date) < ?
+                AND ji.user_id = ?
+                AND ji.is_deleted = 0
+        )
+        SELECT
+            NULL AS journal_date,
+            NULL AS journal_datetime,
+            NULL AS journal_number,
+            'Initial Balance' AS journal_description,
+            COALESCE(pb.debit, 0) AS debit,
+            COALESCE(pb.credit, 0) AS credit,
+
+            COALESCE(pb.debit, 0) - COALESCE(pb.credit, 0) AS balance
+        FROM
+            partner_balance pb
+
+        UNION
+        (
+        SELECT
+        DATE(jv.journal_date) AS journal_date,
+        jv.journal_date AS journal_datetime,
+        jv.journal_number,
+        jv.journal_description,
+        ji.debit,
+        ji.credit,
+        NULL AS balance
+        FROM
+        journal_items ji
+        INNER JOIN
+        journal_vouchers jv ON jv.journal_id = ji.journal_id_fk
+        WHERE
+        ji.account_id_fk  = ?
+        AND DATE(jv.journal_date) BETWEEN ? AND ?
+        AND ji.is_deleted = 0
+        AND ji.user_id = ?
+        )
+        ORDER BY
+        journal_datetime ASC`;
+
+		const [rows] = await pool.query(query, [
+			_531.id,
+			start,
+			user_id,
+			_531.id,
+			start,
+			end,
+			user_id,
+		]);
+		return rows;
+	}
 }
 
 module.exports = BalanceModel;
