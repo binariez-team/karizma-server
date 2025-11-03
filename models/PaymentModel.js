@@ -32,10 +32,10 @@ class Payment {
 			let [_531] = await Accounts.getIdByAccountNumber("531");
 
 			const firstItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: _531.id,
-				user_id: user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
 				debit: paymentData.amount,
@@ -49,6 +49,7 @@ class Payment {
 
 			let [_413] = await Accounts.getIdByAccountNumber("413");
 			const secondItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: _413.id,

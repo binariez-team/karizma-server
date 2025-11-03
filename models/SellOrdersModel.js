@@ -154,8 +154,8 @@ class SellOrders {
 					user_id: user_id,
 					reference_number: payment.reference_number,
 					partner_id_fk: payment.customer_id,
-					debit: 0,
-					credit: payment.amount,
+					debit: payment.amount,
+					credit: 0,
 				};
 
 				await connection.query(
@@ -170,9 +170,9 @@ class SellOrders {
 					account_id_fk: _413.id,
 					reference_number: payment.reference_number,
 					partner_id_fk: null,
-
-					debit: payment.amount,
-					credit: 0,
+					user_id: user_id,
+					debit: 0,
+					credit: payment.amount,
 				};
 				await connection.query(
 					`INSERT INTO journal_items SET ?`,
