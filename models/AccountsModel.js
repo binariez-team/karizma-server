@@ -41,7 +41,7 @@ class Accounts {
 			(
 			SELECT
 			jv.journal_id,
-            SO.order_id,
+            COALESCE(SO.order_id, RO.order_id) AS order_id,
 			jv.journal_date AS full_date,
 			DATE(jv.journal_date) AS journal_date,
 			jv.journal_number,
@@ -58,7 +58,9 @@ class Accounts {
 			accounts aa ON ji.partner_id_fk  = aa.account_id
 			INNER JOIN
 			journal_vouchers jv ON jv.journal_id = ji.journal_id_fk
-			LEFT JOIN sales_orders SO ON jv.journal_id = SO.journal_voucher_id
+			
+			LEFT JOIN sales_orders SO ON jv.journal_description = 'Invoice' AND  jv.journal_id = SO.journal_voucher_id
+			LEFT JOIN return_orders RO ON jv.journal_description = 'Return' AND  jv.journal_id = RO.journal_voucher_id
 			WHERE
 			ji.partner_id_fk  = ?
 			AND DATE(jv.journal_date) BETWEEN ? AND ?
@@ -66,7 +68,7 @@ class Accounts {
 			AND jv.user_id = ?
 			)
 			ORDER BY
-			full_date ASC`;
+			journal_date ASC`;
 		const [rows] = await pool.query(query, [
 			account_id,
 			startDate,

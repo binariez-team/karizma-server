@@ -174,6 +174,19 @@ class History {
 		return rows;
 	}
 
+	// fetch return order items by order id
+	static async fetchReturnOrderItemsById(ids) {
+		let query = `SELECT
+            ROI.*,
+            P.product_name
+            FROM return_order_items ROI
+            INNER JOIN products P ON ROI.product_id = P.product_id
+            WHERE ROI.is_deleted = 0
+            AND order_id IN (?)`;
+		let [results] = await pool.query(query, [ids]);
+		return results;
+	}
+
 	//fetch products dispose history
 	static async fetchDisposeHistory(user_id, criteria) {
 		let sql = `SELECT 

@@ -38,6 +38,17 @@ exports.fetchSalesHistory = async (req, res, next) => {
 	}
 };
 
+// fetch return order items by id
+exports.fetchReturnOrderItemsById = async (req, res, next) => {
+	try {
+		let ids = req.body;
+		let results = await History.fetchReturnOrderItemsById(ids);
+		res.status(200).send(results);
+	} catch (error) {
+		next(error);
+	}
+};
+
 exports.fetchPaymentHistory = async (req, res, next) => {
 	try {
 		const user_id = req.user.user_id;
