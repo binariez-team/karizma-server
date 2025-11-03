@@ -19,7 +19,7 @@ class BalanceModel {
 
 	static async getBalanceByUserId(userId) {
 		const [_531] = await Account.getIdByAccountNumber("531");
-		const query = `SELECT COALESCE(sum(credit) - sum(debit),0) AS balance 
+		const query = `SELECT COALESCE(sum(debit) - sum(credit),0) AS balance 
         FROM journal_items ji
         where ji.is_deleted = 0
         AND ji.account_id_fk = ?
@@ -31,11 +31,11 @@ class BalanceModel {
 
 	static async getAllUsersBalance() {
 		const [_531] = await Account.getIdByAccountNumber("531");
-		const query = `SELECT u.user_id , COALESCE(sum(ji.credit) - sum(ji.debit),0) AS balance 
+		const query = `SELECT u.user_id , COALESCE(sum(ji.debit) - sum(ji.credit),0) AS balance 
             FROM users u
             LEFT JOIN journal_items ji  ON u.user_id = ji.user_id
             AND ji.is_deleted = 0
-            AND ji.account_id_fk= ?
+            AND ji.account_id_fk = ?
             GROUP BY u.user_id;`;
 		const [rows] = await pool.query(query, [_531.id]);
 		return rows;
@@ -83,8 +83,8 @@ class BalanceModel {
 				user_id: admin_account.user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
-				debit: 0,
-				credit: paymentData.amount,
+				debit: paymentData.amount,
+				credit: 0,
 			};
 
 			await connection.query(
@@ -99,8 +99,8 @@ class BalanceModel {
 				user_id: user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: paymentData.customer_id,
-				debit: paymentData.amount,
-				credit: 0,
+				debit: 0,
+				credit: paymentData.amount,
 			};
 			await connection.query(
 				`INSERT INTO journal_items SET ?`,
