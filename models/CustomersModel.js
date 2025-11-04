@@ -18,9 +18,10 @@ class Customer {
 				INNER JOIN accounts a ON ji.partner_id_fk = a.account_id
 
 				WHERE
-					ji.is_deleted = 0
+				ji.is_deleted = 0
 				AND ji.user_id = ?
                 AND a.is_customer = 1
+				AND a.is_deleted = 0
 				GROUP BY ji.partner_id_fk
 
 				HAVING balance != 0

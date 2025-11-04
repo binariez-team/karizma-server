@@ -148,12 +148,12 @@ class SellOrders {
 				let [_531] = await Accounts.getIdByAccountNumber("531");
 
 				const firstItem = {
+					user_id: user_id,
 					journal_id_fk: journal_voucher.insertId,
 					journal_date: payment.payment_date,
 					account_id_fk: _531.id,
-					user_id: user_id,
 					reference_number: payment.reference_number,
-					partner_id_fk: payment.customer_id,
+					partner_id_fk: null,
 					debit: payment.amount,
 					credit: 0,
 				};
@@ -165,12 +165,12 @@ class SellOrders {
 
 				let [_413] = await Accounts.getIdByAccountNumber("413");
 				const secondItem = {
+					user_id: user_id,
 					journal_id_fk: journal_voucher.insertId,
 					journal_date: payment.payment_date,
 					account_id_fk: _413.id,
 					reference_number: payment.reference_number,
-					partner_id_fk: null,
-					user_id: user_id,
+					partner_id_fk: payment.customer_id,
 					debit: 0,
 					credit: payment.amount,
 				};

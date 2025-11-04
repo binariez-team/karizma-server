@@ -156,6 +156,26 @@ class Payment {
 		}
 	}
 
+	// fetch payment by ID
+	static async fetchPaymentById(id) {
+		const query = `SELECT
+				A.name AS partner_name,
+				A.phone AS partner_phone,
+				A.address AS partner_address,
+				A.account_id AS account_id,
+                A.account_id AS partner_id,
+				JV.*,
+                JV.total_value as amount,
+				JV.journal_date AS payment_date
+                FROM journal_vouchers JV
+                INNER JOIN journal_items I ON JV.journal_id = I.journal_id_fk
+                INNER JOIN accounts A ON I.partner_id_fk = A.account_id
+                WHERE JV.is_deleted = 0 AND JV.journal_id = ?`;
+
+		const [[result]] = await pool.query(query, id);
+		return result;
+	}
+
 	static async addSupplierPayment(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {

@@ -15,7 +15,10 @@ exports.editCustomerPayment = async (req, res, next) => {
 	try {
 		const user_id = req.user.user_id;
 		const paymentData = req.body;
-		const result = await Payment.editCustomerPayment(user_id, paymentData);
+		await Payment.editCustomerPayment(user_id, paymentData);
+
+		const result = await Payment.fetchPaymentById(paymentData.journal_id);
+
 		res.status(200).json(result);
 	} catch (error) {
 		next(error);

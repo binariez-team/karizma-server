@@ -106,17 +106,19 @@ class History {
 				A.name AS partner_name,
 				A.phone AS partner_phone,
 				A.address AS partner_address,
-				A.account_id AS partner_id,
+				A.account_id AS account_id,
+                A.account_id AS partner_id,
 				P.*,
-				DATE(P.journal_date) AS payment_date
+				P.total_value as amount,
+				P.journal_date AS payment_date
 			FROM journal_vouchers P
 			INNER JOIN journal_items I ON P.journal_id = I.journal_id_fk
 			INNER JOIN accounts A ON I.partner_id_fk = A.account_id
 			WHERE P.is_deleted = 0 AND P.user_id = ? AND journal_description = 'Payment Received'`;
 		const params = [user_id];
 		if (criteria.payment_number) {
-			sql += ` AND P.journal_number = ?`;
-			params.push(criteria.payment_number);
+			sql += ` AND P.journal_number LIKE ?`;
+			params.push(`%${criteria.payment_number}`);
 		}
 		if (criteria.partner_id) {
 			sql += ` AND I.partner_id_fk = ?`;
