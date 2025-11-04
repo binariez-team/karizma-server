@@ -67,7 +67,7 @@ class ReportModel {
 		query = `SELECT COALESCE(sum(total_cost),0) AS totalDispose
                 FROM dispose_products 
                 WHERE DATE(dispose_datetime) BETWEEN ? AND ?
-                AND user_id = ?;`;
+                AND user_id = ? AND is_deleted = 0;`;
 		let [[dispose]] = await pool.query(query, [
 			startDate,
 			endDate,

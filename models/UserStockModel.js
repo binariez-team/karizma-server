@@ -138,7 +138,7 @@ class UserProduct {
 				[dispose_items]
 			);
 
-			query = `INSERT INTO inventory_transactions (user_id_fk, product_id_fk, transaction_type, transaction_datetime, quantity)
+			query = `INSERT INTO inventory_transactions (user_id_fk, product_id_fk, transaction_type, transaction_datetime, quantity, order_id_fk)
 			VALUES ?;`;
 
 			const values = products.map((product) => [
@@ -147,6 +147,7 @@ class UserProduct {
 				"DISPOSE",
 				info.dispose_datetime,
 				product.quantity,
+				result.insertId,
 			]);
 
 			await connection.query(query, [values]);
@@ -251,9 +252,13 @@ class UserProduct {
 			await connection.query(query, [dispose_id]);
 
 			//inventory_transactions
+			// await connection.query(
+			// 	`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'REVERSEDISPOSE', quantity FROM dispose_products_items WHERE dispose_id = ?`,
+			// 	[user_id, dispose_id]
+			// );
 			await connection.query(
-				`INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity) SELECT product_id, ?, 'REVERSEDISPOSE', quantity FROM dispose_products_items WHERE dispose_id = ?`,
-				[user_id, dispose_id]
+				`DELETE FROM inventory_transactions WHERE transaction_type = 'DISPOSE' AND order_id_fk = ?`,
+				[dispose_id]
 			);
 
 			await connection.commit();
