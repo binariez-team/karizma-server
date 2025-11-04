@@ -56,7 +56,7 @@ class UserProduct {
 					I.unit_price_usd,
 					COALESCE(t.quantity, 0) AS quantity
 				FROM products P
-				INNER JOIN inventory I ON P.product_id = I.product_id_fk
+				INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.user_id_fk = ?
 				LEFT JOIN products_categories C ON P.category_id_fk = C.category_id
 				LEFT JOIN products_brands B ON P.brand_id_fk = B.brand_id
 				LEFT JOIN (
@@ -74,6 +74,7 @@ class UserProduct {
 						SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) +
 						SUM(CASE WHEN transaction_type = 'REVERSEDELIVER' THEN quantity ELSE 0 END) AS quantity
 					FROM inventory_transactions
+					WHERE user_id_fk = ?
 					GROUP BY product_id_fk
 				) t ON P.product_id = t.product_id_fk
 				WHERE P.product_id = ?`;

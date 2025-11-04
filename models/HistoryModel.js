@@ -4,11 +4,19 @@ const moment = require("moment-timezone");
 class History {
 	// get product history
 	static async getProductHistoryById(product_id, user_id) {
-		const query = `SELECT * FROM inventory_transactions
-		WHERE product_id_fk = ?
-		AND user_id_fk = ?
-		AND is_deleted = 0
-		ORDER BY transaction_datetime DESC LIMIT 100`;
+		const query = `SELECT
+			T.*,
+			SUM(T.quantity) OVER (
+				PARTITION BY T.product_id_fk
+				ORDER BY T.transaction_datetime
+				ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+			) AS balance
+			FROM inventory_transactions T
+			WHERE T.product_id_fk = ?
+			AND user_id_fk = ?
+			AND T.is_deleted = 0
+			ORDER BY T.transaction_datetime DESC
+			LIMIT 100000;`;
 		let [rows] = await pool.query(query, [product_id, user_id]);
 		return rows;
 	}
