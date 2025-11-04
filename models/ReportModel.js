@@ -26,7 +26,11 @@ class ReportModel {
                 AND DATE(order_datetime) <= ?
                 AND user_id = ?
                 AND is_deleted = 0`;
-		let [[returns]] = await pool.query(query, [startDate, endDate, user_id]);
+		let [[returns]] = await pool.query(query, [
+			startDate,
+			endDate,
+			user_id,
+		]);
 
 		query = `SELECT
                 COALESCE(SUM(total_value), 0) AS totalPayment
@@ -38,7 +42,11 @@ class ReportModel {
                 AND user_id = ?
                 AND journal_description = 'Payment'
                 AND is_deleted = 0`;
-		let [[payments]] = await pool.query(query, [startDate, endDate, user_id]);
+		let [[payments]] = await pool.query(query, [
+			startDate,
+			endDate,
+			user_id,
+		]);
 
 		query = `SELECT
                 COALESCE(SUM(total_value), 0) AS totalExpense
@@ -50,13 +58,21 @@ class ReportModel {
                 AND user_id = ?
                 AND journal_description = 'Expense'
                 AND is_deleted = 0`;
-		let [[expenses]] = await pool.query(query, [startDate, endDate, user_id]);
+		let [[expenses]] = await pool.query(query, [
+			startDate,
+			endDate,
+			user_id,
+		]);
 
 		query = `SELECT COALESCE(sum(total_cost),0) AS totalDispose
                 FROM dispose_products 
                 WHERE DATE(dispose_datetime) BETWEEN ? AND ?
                 AND user_id = ?;`;
-		let [[dispose]] = await pool.query(query, [startDate, endDate, user_id]);
+		let [[dispose]] = await pool.query(query, [
+			startDate,
+			endDate,
+			user_id,
+		]);
 
 		query = `SELECT
         COALESCE(SUM(total_value), 0) AS totalMoneyTransfer
@@ -85,7 +101,7 @@ class ReportModel {
         WHERE P.is_deleted = 0 
         AND DATE(P.journal_date) BETWEEN ? AND ?
         AND P.user_id = ?
-        AND journal_description = 'Payment';`;
+        AND journal_description = 'Payment Received';`;
 		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
 		return result;
 	}
