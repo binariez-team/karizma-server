@@ -276,6 +276,7 @@ class SellOrders {
 			let [_4111] = await Accounts.getIdByAccountNumber("4111");
 
 			const firstItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _4111.id,
@@ -292,12 +293,12 @@ class SellOrders {
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _7011.id,
 				reference_number: order.reference_number,
 				partner_id_fk: null,
-
 				debit: 0,
 				credit: order.total_amount,
 			};

@@ -21,6 +21,8 @@ class Expense {
 		const accounts = await Accounts.getAccountsByAccountNumber("6112%");
 		return accounts;
 	}
+
+	// new expense
 	static async createExpense(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {
@@ -50,32 +52,35 @@ class Expense {
 			let [_531] = await Accounts.getIdByAccountNumber("531");
 
 			const firstItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: _531.id,
-				user_id: user_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
 				debit: paymentData.amount,
 				credit: 0,
-				exchange_value: paymentData.exchange_rate,
 			};
 
-			await connection.query(`INSERT INTO journal_items SET ?`, firstItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				firstItem
+			);
 
 			const secondItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: paymentData.account_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
-				currency: "USD",
 				debit: 0,
 				credit: paymentData.amount,
-				exchange_value: paymentData.exchange_rate,
 			};
-			await connection.query(`INSERT INTO journal_items SET ?`, secondItem);
+			await connection.query(
+				`INSERT INTO journal_items SET ?`,
+				secondItem
+			);
 
 			await connection.commit();
 		} catch (error) {
