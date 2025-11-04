@@ -40,7 +40,7 @@ class ReportModel {
                 DATE(journal_date) >= ?
                 AND DATE(journal_date) <= ?
                 AND user_id = ?
-                AND journal_description = 'Payment'
+                AND journal_description = 'Payment Received'
                 AND is_deleted = 0`;
 		let [[payments]] = await pool.query(query, [
 			startDate,
@@ -94,6 +94,10 @@ class ReportModel {
 	}
 
 	static async getTotalPayments(user_id, startDate, endDate) {
+		console.log(startDate);
+		console.log(endDate);
+		console.log(user_id);
+
 		let query = `
         SELECT
         COALESCE(sum(total_value), 0) as totalPayment
