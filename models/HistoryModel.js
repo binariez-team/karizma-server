@@ -50,8 +50,8 @@ class History {
             WHERE O.is_deleted = 0 AND A.user_id = ? `;
 		const params = [user_id];
 		if (criteria.invoice_number) {
-			sql += ` AND O.invoice_number = ?`;
-			params.push(criteria.invoice_number);
+			sql += ` AND O.invoice_number LIKE ?`;
+			params.push(`%${criteria.invoice_number}`);
 		}
 		if (criteria.customer_id) {
 			sql += ` AND O.customer_id = ?`;
@@ -67,6 +67,41 @@ class History {
         LIMIT ? OFFSET ?`;
 		params.push(criteria.limit || 100);
 		params.push(criteria.offset || 0);
+
+		const [rows] = await pool.query(sql, params);
+		return rows;
+	}
+
+	// fetch products sales history
+	static async fetchProductsSalesHistory(user_id, criteria) {
+		let sql = `SELECT soi.*, p.sku, p.product_name, a.name AS customer_name, so.invoice_number, so.order_datetime 
+			FROM sales_order_items soi 
+			INNER JOIN sales_orders so ON soi.order_id = so.order_id
+			INNER JOIN products p ON soi.product_id = p.product_id
+			INNER JOIN accounts a ON so.customer_id = a.account_id
+
+			WHERE soi.is_deleted = 0 
+			AND so.user_id = ? `;
+		const params = [user_id];
+		if (criteria.customer_id) {
+			sql += ` AND so.customer_id = ?`;
+			params.push(criteria.customer_id);
+		}
+		if (criteria.product_id) {
+			sql += ` AND soi.product_id = ?`;
+			params.push(criteria.product_id);
+		}
+		if (criteria.invoice_number) {
+			sql += ` AND so.invoice_number LIKE ?`;
+			params.push(`%${criteria.invoice_number}`);
+		}
+		if (criteria.invoice_date) {
+			sql += ` AND DATE(order_datetime) = ?`;
+			params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+		}
+
+		sql += ` ORDER BY order_datetime DESC`;
+		params.push(criteria.limit || 1000);
 
 		const [rows] = await pool.query(sql, params);
 		return rows;

@@ -93,11 +93,12 @@ class SellOrders {
 					item.price_type,
 					item.unit_cost,
 					item.quantity * item.unit_price,
+					item.avg_cost,
 				];
 			});
 
 			await connection.query(
-				`INSERT INTO sales_order_items (order_id, product_id, quantity,  unit_price, price_type,unit_cost, total_price ) VALUES ?`,
+				`INSERT INTO sales_order_items (order_id, product_id, quantity,  unit_price, price_type,unit_cost, total_price, avg_cost) VALUES ?`,
 				[invoice_map]
 			);
 
@@ -251,9 +252,10 @@ class SellOrders {
 			// insert the new order
 
 			// fix date
-			order.order_datetime = moment(order.order_datetime).format(
-				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
-			);
+			// order.order_datetime = moment(order.order_datetime).format(
+			// 	`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+			// );
+			order.order_datetime = orderCheck.order_datetime;
 
 			// fix invoice number
 			order.invoice_number = `INV${order.invoice_number.padStart(

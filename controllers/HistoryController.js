@@ -38,6 +38,19 @@ exports.fetchSalesHistory = async (req, res, next) => {
 	}
 };
 
+// fetch products history
+exports.fetchProductsSalesHistory = async (req, res, next) => {
+	try {
+		const user_id = req.user.user_id;
+		const criteria = req.body;
+
+		const data = await History.fetchProductsSalesHistory(user_id, criteria);
+		res.status(200).send(data);
+	} catch (error) {
+		next(error);
+	}
+};
+
 // fetch return order items by id
 exports.fetchReturnOrderItemsById = async (req, res, next) => {
 	try {
