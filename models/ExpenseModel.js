@@ -58,8 +58,8 @@ class Expense {
 				account_id_fk: _531.id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
-				debit: paymentData.amount,
-				credit: 0,
+				debit: 0,
+				credit: paymentData.amount,
 			};
 
 			await connection.query(
@@ -74,8 +74,8 @@ class Expense {
 				account_id_fk: paymentData.account_id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
-				debit: 0,
-				credit: paymentData.amount,
+				debit: paymentData.amount,
+				credit: 0,
 			};
 			await connection.query(
 				`INSERT INTO journal_items SET ?`,

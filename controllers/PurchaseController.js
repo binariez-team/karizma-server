@@ -31,7 +31,9 @@ exports.editOrder = async (req, res, next) => {
 		const items = order.items;
 		delete order.items;
 
-		const result = await PurchaseOrders.editOrder(order, items);
+		const { user_id } = req.user;
+
+		const result = await PurchaseOrders.editOrder(order, items, user_id);
 		const new_order = await PurchaseOrders.getAddedOrderById(
 			result.insertId
 		);
