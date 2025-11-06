@@ -4,19 +4,60 @@ const moment = require("moment-timezone");
 class History {
 	// get product history
 	static async getProductHistoryById(product_id, user_id) {
+		// const query = `SELECT
+		// 	T.*,
+		// 	SUM(T.quantity) OVER (
+		// 		PARTITION BY T.product_id_fk
+		// 		ORDER BY T.transaction_datetime
+		// 		ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+		// 	) AS balance
+		// 	FROM inventory_transactions T
+		// 	WHERE T.product_id_fk = ?
+		// 	AND user_id_fk = ?
+		// 	AND T.is_deleted = 0
+		// 	ORDER BY T.transaction_datetime DESC
+		// 	LIMIT 100000;`;
+
 		const query = `SELECT
-			T.*,
-			SUM(T.quantity) OVER (
-				PARTITION BY T.product_id_fk
-				ORDER BY T.transaction_datetime
-				ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-			) AS balance
-			FROM inventory_transactions T
-			WHERE T.product_id_fk = ?
-			AND user_id_fk = ?
-			AND T.is_deleted = 0
-			ORDER BY T.transaction_datetime DESC
-			LIMIT 100000;`;
+			final.*,
+			A.name AS account_name
+		FROM (
+			SELECT
+				sub.*,
+				COALESCE(SO.customer_id, RO.customer_id, PO.partner_id_fk) AS account_id,
+				CASE
+					WHEN sub.transaction_type = 'SALE' THEN 'sales_orders'
+					WHEN sub.transaction_type = 'RETURN' THEN 'return_orders'
+					WHEN sub.transaction_type = 'SUPPLY' THEN 'purchase_orders'
+					ELSE NULL
+				END AS order_table
+			FROM (
+				SELECT
+					T.*,
+					SUM(T.quantity) OVER (
+						PARTITION BY T.product_id_fk
+						ORDER BY T.transaction_datetime
+						ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+					) AS balance
+				FROM inventory_transactions T
+				WHERE T.product_id_fk = ?
+                AND T.user_id_fk = ?
+				AND T.is_deleted = 0
+			) AS sub
+			LEFT JOIN sales_orders SO 
+				ON sub.transaction_type = 'SALE' 
+			AND sub.order_id_fk = SO.order_id
+			LEFT JOIN return_orders RO 
+				ON sub.transaction_type = 'RETURN' 
+			AND sub.order_id_fk = RO.order_id
+			LEFT JOIN purchase_orders PO 
+				ON sub.transaction_type = 'SUPPLY' 
+			AND sub.order_id_fk = PO.order_id
+		) AS final
+		LEFT JOIN accounts A 
+			ON final.account_id = A.account_id
+		ORDER BY final.transaction_datetime DESC
+		LIMIT 10000;`;
 		let [rows] = await pool.query(query, [product_id, user_id]);
 		return rows;
 	}
