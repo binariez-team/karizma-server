@@ -222,7 +222,9 @@ class SellOrders {
 				product_id = element.product_id;
 				quantity = element.quantity;
 				// update inventory
-				inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, quantity, order_id_fk, transaction_notes) VALUES (${product_id}, ${user_id}, 'SALE', ${-quantity}, ${order_id}, '${
+				inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, user_id_fk, transaction_type, transaction_datetime, quantity, order_id_fk, transaction_notes) VALUES (${product_id}, ${user_id}, 'SALE', '${
+					orderCheck.order_datetime
+				}', ${-quantity}, ${order_id}, '${
 					orderCheck.invoice_number
 				}');`;
 			});
