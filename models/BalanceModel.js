@@ -42,7 +42,6 @@ class BalanceModel {
 	}
 
 	//transfer money
-
 	static async transferMoney(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {
@@ -59,10 +58,19 @@ class BalanceModel {
 
 			let payment_number = `TRA${number.toString().padStart(4, "0")}`;
 
-			//get admin account
-			let [[admin_account]] = await connection.query(
-				`SELECT user_id FROM users WHERE user_type = 'admin' and is_deleted = 0`
+			//get receiver account name
+			let [[receiver]] = await connection.query(
+				`SELECT first_name FROM users WHERE user_id = ?`,
+				[paymentData.to_user_id]
 			);
+
+			//get sender account name
+			let [[sender]] = await connection.query(
+				`SELECT first_name FROM users WHERE user_id = ?`,
+				[user_id]
+			);
+
+			console.log(receiver.first_name);
 
 			//insert to vouchers and journal_items
 			let query = `INSERT INTO journal_vouchers ( user_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
@@ -70,21 +78,21 @@ class BalanceModel {
 				user_id,
 				payment_number,
 				paymentData.payment_date,
-				"Transfer",
+				`Transfer`,
 				paymentData.amount,
 			]);
 
 			let [_531] = await Account.getIdByAccountNumber("531");
 
 			const firstItem = {
+				user_id: paymentData.to_user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: _531.id,
-				user_id: admin_account.user_id,
-				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
 				debit: paymentData.amount,
 				credit: 0,
+				notes: `From ${sender.first_name}`,
 			};
 
 			await connection.query(
@@ -93,14 +101,14 @@ class BalanceModel {
 			);
 
 			const secondItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
 				account_id_fk: _531.id,
-				user_id: user_id,
-				reference_number: paymentData.reference_number,
 				partner_id_fk: paymentData.customer_id,
 				debit: 0,
 				credit: paymentData.amount,
+				notes: `To ${receiver.first_name}`,
 			};
 			await connection.query(
 				`INSERT INTO journal_items SET ?`,
@@ -200,9 +208,13 @@ class BalanceModel {
 	}
 
 	static async getTransferAccounts(user_id) {
-		const query = `SELECT u.user_id, u.first_name, u.last_name, CONCAT(u.first_name, ' ', u.last_name) AS full_name
-			FROM users u
-			WHERE u.user_id != ? AND user_type = 'admin';`;
+		const query = `SELECT
+			u.user_id,
+			u.first_name,
+			u.last_name,
+			CONCAT(u.first_name, ' ', u.last_name) AS full_name
+		FROM users u
+			WHERE u.user_id != ? AND u.is_deleted = false;`;
 		const [rows] = await pool.query(query, [user_id]);
 		return rows;
 	}
@@ -231,6 +243,7 @@ class BalanceModel {
             'Initial Balance' AS journal_description,
             COALESCE(pb.debit, 0) AS debit,
             COALESCE(pb.credit, 0) AS credit,
+			NULL as notes,
 
             COALESCE(pb.debit, 0) - COALESCE(pb.credit, 0) AS balance
         FROM
@@ -245,6 +258,7 @@ class BalanceModel {
         jv.journal_description,
         ji.debit,
         ji.credit,
+		ji.notes,
         NULL AS balance
         FROM
         journal_items ji

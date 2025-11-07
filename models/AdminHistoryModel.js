@@ -42,6 +42,7 @@ class AdminHistory {
 	static async fetchMoneyTransferHistory(criteria) {
 		let sql = `SELECT 
         	U.first_name AS first_name,
+			U.last_name AS last_name,
         	jv.*,
         	DATE(jv.journal_date) AS order_date
 			FROM journal_vouchers jv 
