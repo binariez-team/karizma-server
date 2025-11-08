@@ -109,6 +109,37 @@ class ReportModel {
 		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
 		return result;
 	}
+
+	// get stock value
+	static async getStockValue(user_id) {
+		const query = `SELECT
+            SUM(T.quantity * P.unit_cost_usd) AS cost_value_usd,
+            SUM(T.quantity * I.unit_price_usd) AS selling_value_usd,
+            SUM(T.quantity) AS total_quantity_usd
+
+        FROM products P
+        LEFT JOIN (
+            SELECT
+                product_id_fk,
+                SUM(
+					CASE WHEN transaction_type IN (
+                    'SALE', 'SUPPLY','RETURN','DELETE', 'DISPOSE','DELIVER', 'REVERSERETURN', 'REVERSEDISPOSE', 'REVERSEDELIVER', 'ADD', 'REMOVE'
+                )
+				THEN quantity ELSE 0
+				END
+			) AS quantity
+            FROM inventory_transactions
+			WHERE user_id_fk = ?
+            GROUP BY product_id_fk
+        ) T ON P.product_id = T.product_id_fk
+		LEFT JOIN inventory I ON I.product_id_fk = P.product_id
+        WHERE P.is_deleted = 0
+		AND I.user_id_fk = ?
+        AND T.quantity > 0`;
+		let [[result]] = await pool.query(query, [user_id, user_id]);
+
+		return result;
+	}
 }
 
 module.exports = ReportModel;
