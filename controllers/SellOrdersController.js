@@ -8,8 +8,16 @@ exports.addOrder = async (req, res, next) => {
 		delete order.items;
 
 		order.user_id = user_id;
-		const result = await SellOrders.addOrder(order, items, user_id, payment);
-		const new_order = await SellOrders.getAddedOrderById(result.order, user_id);
+		const result = await SellOrders.addOrder(
+			order,
+			items,
+			user_id,
+			payment
+		);
+		const new_order = await SellOrders.getAddedOrderById(
+			result.order,
+			user_id
+		);
 		res.status(201).json(new_order);
 	} catch (error) {
 		next(error);

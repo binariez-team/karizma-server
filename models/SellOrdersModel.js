@@ -400,9 +400,21 @@ class SellOrders {
 
 	// get added order by id
 	static async getAddedOrderById(order_id, user_id) {
-		const [order] = await pool.query(
-			`SELECT * FROM sales_orders WHERE order_id = ? AND user_id = ?`,
-			[order_id, user_id]
+		const [[order]] = await pool.query(
+			`SELECT
+                A.name AS customer_name,
+                A.phone AS customer_phone,
+                A.address AS customer_address,
+                O.*,
+                DATE(O.order_datetime) AS order_date,
+                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
+            FROM sales_orders O
+            INNER JOIN sales_order_items M ON O.order_id = M.order_id
+            INNER JOIN products S ON S.product_id = M.product_id
+            INNER JOIN accounts  A ON O.customer_id = A.account_id
+            WHERE O.is_deleted = 0 AND O.order_id = ? 
+			GROUP BY O.order_id`,
+			[order_id]
 		);
 		return order;
 	}
