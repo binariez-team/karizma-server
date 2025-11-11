@@ -25,7 +25,6 @@ class Accounts {
 			SELECT
 				NULL AS journal_id,
                 NULL AS order_id,
-				NULL AS full_date,
 				NULL AS journal_date,
 				NULL AS journal_number,
 				'Initial Balance' AS journal_description,
@@ -42,8 +41,7 @@ class Accounts {
 			SELECT
 			jv.journal_id,
             COALESCE(SO.order_id, RO.order_id) AS order_id,
-			jv.journal_date AS full_date,
-			DATE(jv.journal_date) AS journal_date,
+			jv.journal_date AS journal_date,
 			jv.journal_number,
 			jv.journal_description,
 			ji.debit,

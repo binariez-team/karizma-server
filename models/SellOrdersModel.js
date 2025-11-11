@@ -126,9 +126,12 @@ class SellOrders {
 			}
 
 			if (payment) {
-				payment.payment_date = moment(payment.payment_date).format(
-					`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
-				);
+				// payment.payment_date = moment(payment.payment_date).format(
+				// 	`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+				// );
+				payment.payment_date = moment(payment.payment_date)
+					.add(1, "seconds")
+					.format(`YYYY-MM-DD HH:mm:ss`);
 
 				let [[{ number }]] = await connection.query(
 					`SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`
