@@ -33,6 +33,7 @@ class ReturnModel {
 			let [_4111] = await Accounts.getIdByAccountNumber("4111");
 
 			const firstItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _4111.id,
@@ -50,6 +51,7 @@ class ReturnModel {
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _7011.id,
@@ -82,6 +84,7 @@ class ReturnModel {
 					item.unit_price,
 					item.price_type,
 					item.unit_cost,
+					item.avg_cost,
 					item.quantity * item.unit_price,
 				];
 			});
@@ -174,6 +177,8 @@ class ReturnModel {
 			connection.release();
 		}
 	}
+
+	// edit return
 	static async editReturn(user_id, order, items) {
 		const connection = await pool.getConnection();
 		try {
@@ -255,6 +260,7 @@ class ReturnModel {
 			let [_4111] = await Accounts.getIdByAccountNumber("4111");
 
 			const firstItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _4111.id,
@@ -272,6 +278,7 @@ class ReturnModel {
 
 			let [_7011] = await Accounts.getIdByAccountNumber("7011");
 			const secondItem = {
+				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: order.order_datetime,
 				account_id_fk: _7011.id,
@@ -304,6 +311,7 @@ class ReturnModel {
 					item.unit_price,
 					item.price_type,
 					item.unit_cost,
+					item.avg_cost,
 					item.quantity * item.unit_price,
 				];
 			});

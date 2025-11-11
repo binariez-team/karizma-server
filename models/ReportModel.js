@@ -215,7 +215,7 @@ class ReportModel {
                 COALESCE(SUM(total_debts), 0) AS total_debts
             FROM (
                 SELECT
-                    COALESCE(SUM(ji.debit), 0) AS total_debts
+                    COALESCE(SUM(ji.debit) - SUM(ji.credit), 0) AS total_debts
                 FROM
                     journal_items ji
                 INNER JOIN
@@ -224,13 +224,21 @@ class ReportModel {
                     accounts a ON ji.partner_id_fk = a.account_id
                 WHERE
                     ji.is_deleted = 0
+					AND jv.is_deleted = 0
                     AND a.is_customer = 1
-                    AND jv.journal_date BETWEEN ? AND ?
+					AND a.is_deleted = 0
+                    AND DATE(jv.journal_date) BETWEEN ? AND ?
                     AND jv.user_id = ?
                 GROUP BY
                     ji.partner_id_fk
             ) AS customer_balances;`;
 		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
+		console.log(startDate);
+		console.log(endDate);
+		console.log(user_id);
+
+		console.log(result);
+
 		return result;
 	}
 

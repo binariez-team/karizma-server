@@ -5,27 +5,6 @@ const moment = require("moment-timezone");
 class Customer {
 	// get customers debts
 	static async getCustomerDebts(user_id) {
-		// let query = `SELECT
-		// 			a.account_id,
-		// 			a.name,
-		// 			a.phone,
-		// 			COALESCE(SUM(ji.debit) - SUM(ji.credit), 0) AS balance
-		// 		FROM
-		// 			journal_items ji
-
-		// 		LEFT JOIN journal_vouchers jv ON jv.journal_id = ji.journal_id_fk
-
-		// 		INNER JOIN accounts a ON ji.partner_id_fk = a.account_id
-
-		// 		WHERE
-		// 		ji.is_deleted = 0
-		// 		AND ji.user_id = ?
-		//         AND a.is_customer = 1
-		// 		AND a.is_deleted = 0
-		// 		GROUP BY ji.partner_id_fk
-
-		// 		HAVING balance != 0
-		// 		ORDER BY balance DESC`;
 		let query = `SELECT
 			a.account_id,
 			a.name,
