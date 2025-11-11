@@ -64,6 +64,7 @@ class Payment {
 			);
 
 			await connection.commit();
+			return journal_voucher.insertId;
 		} catch (error) {
 			await connection.rollback();
 			throw error;
@@ -159,10 +160,11 @@ class Payment {
 	// fetch payment by ID
 	static async fetchPaymentById(id) {
 		const query = `SELECT
-				A.name AS partner_name,
-				A.phone AS partner_phone,
-				A.address AS partner_address,
+				A.name AS customer_name,
+				A.phone AS customer_phone,
+				A.address AS customer_address,
 				A.account_id AS account_id,
+				A.account_id AS customer_id,
                 A.account_id AS partner_id,
 				JV.*,
                 JV.total_value as amount,

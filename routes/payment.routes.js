@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const PaymentController = require("../controllers/PaymentController");
+const PaymentController = require("../controllers/Payment.controller");
 
 router.post("/customer", PaymentController.addCustomerPayment);
 router.put("/customer", PaymentController.editCustomerPayment);

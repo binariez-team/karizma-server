@@ -188,9 +188,13 @@ class History {
 	static async fetchPaymentHistory(user_id, criteria) {
 		let sql = `SELECT
 				A.name AS partner_name,
+				A.name AS customer_name,
 				A.phone AS partner_phone,
+				A.phone AS customer_phone,
 				A.address AS partner_address,
+				A.address AS customer_address,
 				A.account_id AS account_id,
+				A.account_id AS customer_id,
                 A.account_id AS partner_id,
 				P.*,
 				P.total_value as amount,
