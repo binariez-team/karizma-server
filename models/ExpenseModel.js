@@ -141,14 +141,14 @@ class Expense {
 			await connection.beginTransaction();
 
 			moment.tz.setDefault("Asia/Beirut");
-			paymentData.payment_date = moment(paymentData.payment_date).format(
-				`YYYY-MM-DD HH:mm:ss`
-			);
+			// paymentData.payment_date = moment(paymentData.payment_date).format(
+			// 	`YYYY-MM-DD HH:mm:ss`
+			// );
 
 			// update journal vouchers and journal items
-			let query = `UPDATE journal_vouchers SET journal_date = ?, journal_description = ?, total_value = ? WHERE journal_id = ? AND user_id = ?`;
+			let query = `UPDATE journal_vouchers SET journal_description = ?, total_value = ? WHERE journal_id = ? AND user_id = ?`;
 			await connection.query(query, [
-				paymentData.payment_date,
+				// paymentData.payment_date,
 				paymentData.journal_description,
 				paymentData.amount,
 				paymentData.journal_id,
@@ -158,10 +158,10 @@ class Expense {
 			let [_531] = await Accounts.getIdByAccountNumber("531");
 
 			await connection.query(
-				`UPDATE journal_items SET credit = ?, journal_date = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
+				`UPDATE journal_items SET credit = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
 				[
 					paymentData.amount,
-					paymentData.payment_date,
+					// paymentData.payment_date,
 					// paymentData.journal_description,
 					paymentData.journal_id,
 					_531.id,
@@ -170,10 +170,10 @@ class Expense {
 
 			let [_6112] = await Accounts.getIdByAccountNumber("6112");
 			await connection.query(
-				`UPDATE journal_items SET debit = ?, journal_date = ?, account_id_fk = ? WHERE journal_id_fk = ? AND account_id_fk != ?`,
+				`UPDATE journal_items SET debit = ?, account_id_fk = ? WHERE journal_id_fk = ? AND account_id_fk != ?`,
 				[
 					paymentData.amount,
-					paymentData.payment_date,
+					// paymentData.payment_date,
 					_6112.id,
 					paymentData.journal_id,
 					_531.id,
