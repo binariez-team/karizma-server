@@ -148,7 +148,7 @@ class UserProduct {
 				product.product_id,
 				"DISPOSE",
 				info.dispose_datetime,
-				product.quantity,
+				-product.quantity,
 				result.insertId,
 			]);
 

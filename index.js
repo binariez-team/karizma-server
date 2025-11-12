@@ -58,6 +58,7 @@ app.use("/balance", auth, BalanceRoutes);
 app.use("/expense", auth, ExpenseRoutes);
 app.use("/report", auth, ReportRoutes);
 app.use("/return", auth, ReturnRoutes);
+app.use("/dispose", auth, require("./routes/dispose.routes"));
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);
