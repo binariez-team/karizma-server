@@ -141,6 +141,16 @@ class Customer {
 		return result;
 	}
 
+	// get customer name
+	static async getCustomerNameById(account_id) {
+		const [[{ name }]] = await pool.query(
+			`SELECT name FROM accounts WHERE account_id = ? AND is_deleted = 0`,
+			[account_id]
+		);
+
+		return name;
+	}
+
 	//create a customer related to user
 	static async createCustomerByUserId(user_id, data) {
 		data.is_customer = 1;

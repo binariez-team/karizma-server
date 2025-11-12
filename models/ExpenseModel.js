@@ -3,26 +3,67 @@ const Accounts = require("../models/AccountsModel");
 const moment = require("moment-timezone");
 
 class Expense {
-	static async getExpenseDetails(user_id) {
+	// get expense details
+	static async getExpenseDetails(expenseNumber, startDate, endDate, user_id) {
+		// cash account
 		const [_531] = await Accounts.getIdByAccountNumber("531");
-		const query = `SELECT jv.journal_id,jv.journal_number,jv.journal_date as payment_date,jv.total_value, ji.account_id_fk,coa.account_number as account_number , coa.english_name, coa.arabic_name
+
+		// params
+		const params = [user_id];
+		params.push(_531.id);
+		let sql = `SELECT
+        jv.journal_id,
+        jv.journal_number,
+        jv.journal_description,
+        jv.journal_date as payment_date,
+        jv.total_value,
+        ji.account_id_fk
+
         FROM journal_vouchers jv
-        JOIN journal_items ji 
-        ON jv.journal_id = ji.journal_id_fk 
-        JOIN chart_of_accounts coa
-        ON coa.id = ji.account_id_fk
-        WHERE jv.user_id = ? AND jv.journal_description = 'Expense'
-        AND ji.is_deleted = 0
-        AND ji.account_id_fk != ?`;
-		const [expenses] = await pool.query(query, [user_id, _531.id]);
+
+        INNER JOIN journal_items ji ON jv.journal_id = ji.journal_id_fk
+
+		WHERE jv.user_id = ?
+        AND ji.account_id_fk != ?
+        AND ji.is_deleted = 0`;
+
+		if (expenseNumber) {
+			sql += ` AND jv.journal_number LIKE ?`;
+			if (expenseNumber.substr(0, 3) === "EXP") {
+				params.push(`%${expenseNumber}`);
+			} else {
+				params.push(`%EXP${expenseNumber}`);
+			}
+		} else {
+			sql += ` AND jv.journal_number LIKE 'EXP%' `;
+		}
+		if (startDate) {
+			sql += ` AND DATE(jv.journal_date) >= ? `;
+			params.push(startDate);
+		}
+		if (endDate) {
+			sql += ` AND DATE(jv.journal_date) <= ? `;
+			params.push(endDate);
+		}
+
+		sql += ` ORDER BY payment_date DESC `;
+		if (expenseNumber || startDate || endDate) {
+			// do nothing now for LIMITING (no limit)
+		} else {
+			sql += ` LIMIT 100`;
+		}
+
+		const [expenses] = await pool.query(sql, params);
 		return expenses;
 	}
+
+	// get expense accounts
 	static async getExpenseAccounts() {
 		const accounts = await Accounts.getAccountsByAccountNumber("6112%");
 		return accounts;
 	}
 
-	// new expense
+	// create expense
 	static async createExpense(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {
@@ -30,7 +71,7 @@ class Expense {
 
 			moment.tz.setDefault("Asia/Beirut");
 			paymentData.payment_date = moment(paymentData.payment_date).format(
-				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+				`YYYY-MM-DD HH:mm:ss`
 			);
 
 			let [[{ number }]] = await connection.query(
@@ -40,18 +81,18 @@ class Expense {
 			let payment_number = `EXP${number.toString().padStart(4, "0")}`;
 
 			//insert to vouchers and journal_items
-			let query = `INSERT INTO journal_vouchers ( user_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
+			let query = `INSERT INTO journal_vouchers (journal_number, journal_date, journal_description, total_value, user_id) VALUES (?, ?, ?, ?, ?)`;
 			const [journal_voucher] = await connection.query(query, [
-				user_id,
 				payment_number,
 				paymentData.payment_date,
-				"Expense",
+				paymentData.journal_description,
 				paymentData.amount,
+				user_id,
 			]);
 
 			let [_531] = await Accounts.getIdByAccountNumber("531");
 
-			const firstItem = {
+			const cashAccount = {
 				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
@@ -60,18 +101,20 @@ class Expense {
 				partner_id_fk: null,
 				debit: 0,
 				credit: paymentData.amount,
+				// notes: paymentData.journal_description,
 			};
-
 			await connection.query(
 				`INSERT INTO journal_items SET ?`,
-				firstItem
+				cashAccount
 			);
+
+			let [_6112] = await Accounts.getIdByAccountNumber("6112");
 
 			const secondItem = {
 				user_id: user_id,
 				journal_id_fk: journal_voucher.insertId,
 				journal_date: paymentData.payment_date,
-				account_id_fk: paymentData.account_id,
+				account_id_fk: _6112.id,
 				reference_number: paymentData.reference_number,
 				partner_id_fk: null,
 				debit: paymentData.amount,
@@ -90,6 +133,8 @@ class Expense {
 			connection.release();
 		}
 	}
+
+	// update expense
 	static async updateExpense(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {
@@ -97,13 +142,14 @@ class Expense {
 
 			moment.tz.setDefault("Asia/Beirut");
 			paymentData.payment_date = moment(paymentData.payment_date).format(
-				`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+				`YYYY-MM-DD HH:mm:ss`
 			);
 
-			//insert to vouchers and journal_items
-			let query = `UPDATE journal_vouchers SET journal_date = ? ,  total_value = ? WHERE journal_id = ? and user_id = ?`;
-			const [journal_voucher] = await connection.query(query, [
+			// update journal vouchers and journal items
+			let query = `UPDATE journal_vouchers SET journal_date = ?, journal_description = ?, total_value = ? WHERE journal_id = ? AND user_id = ?`;
+			await connection.query(query, [
 				paymentData.payment_date,
+				paymentData.journal_description,
 				paymentData.amount,
 				paymentData.journal_id,
 				user_id,
@@ -112,21 +158,23 @@ class Expense {
 			let [_531] = await Accounts.getIdByAccountNumber("531");
 
 			await connection.query(
-				`UPDATE journal_items SET debit=?, journal_date=? WHERE journal_id_fk=? AND account_id_fk=?`,
+				`UPDATE journal_items SET credit = ?, journal_date = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
 				[
 					paymentData.amount,
 					paymentData.payment_date,
+					// paymentData.journal_description,
 					paymentData.journal_id,
 					_531.id,
 				]
 			);
 
+			let [_6112] = await Accounts.getIdByAccountNumber("6112");
 			await connection.query(
-				`UPDATE journal_items SET debit=?, journal_date=?, account_id_fk=? WHERE journal_id_fk=? AND account_id_fk!=?`,
+				`UPDATE journal_items SET debit = ?, journal_date = ?, account_id_fk = ? WHERE journal_id_fk = ? AND account_id_fk != ?`,
 				[
 					paymentData.amount,
 					paymentData.payment_date,
-					paymentData.account_id,
+					_6112.id,
 					paymentData.journal_id,
 					_531.id,
 				]
@@ -140,27 +188,20 @@ class Expense {
 			connection.release();
 		}
 	}
+
+	// delete expense
 	static async deleteExpense(user_id, journal_id) {
 		const connection = await pool.getConnection();
 		try {
 			await connection.beginTransaction();
 
-			let [journal_items] = await connection.query(
-				`SELECT journal_item_id FROM journal_items ji
-                inner join journal_vouchers jv 
-                ON jv.journal_id = ji.journal_id_fk 
-                WHERE journal_id_fk = ? AND jv.user_id = ?`,
+			await connection.query(
+				`DELETE FROM journal_items WHERE journal_id_fk = ? AND user_id = ?`,
 				[journal_id, user_id]
 			);
-			journal_items = journal_items.map((item) => item.journal_item_id);
 
 			await connection.query(
-				`UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,
-				[journal_items]
-			);
-
-			await connection.query(
-				`UPDATE journal_vouchers SET is_deleted = 1 WHERE journal_id = ? AND user_id = ?`,
+				`DELETE FROM journal_vouchers WHERE journal_id = ? AND user_id = ?`,
 				[journal_id, user_id]
 			);
 

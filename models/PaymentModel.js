@@ -1,8 +1,10 @@
 const pool = require("../config/database");
 const Accounts = require("./AccountsModel");
+const Customer = require("./CustomersModel");
 const moment = require("moment-timezone");
 
 class Payment {
+	// create payment
 	static async addCustomerPayment(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {
@@ -30,6 +32,9 @@ class Payment {
 			]);
 
 			let [_531] = await Accounts.getIdByAccountNumber("531");
+			const customer_name = await Customer.getCustomerNameById(
+				paymentData.account_id
+			);
 
 			const firstItem = {
 				user_id: user_id,
@@ -40,6 +45,7 @@ class Payment {
 				partner_id_fk: null,
 				debit: paymentData.amount,
 				credit: 0,
+				notes: customer_name,
 			};
 
 			await connection.query(
@@ -73,6 +79,7 @@ class Payment {
 		}
 	}
 
+	// edit payment
 	static async editCustomerPayment(user_id, paymentData) {
 		const connection = await pool.getConnection();
 		try {

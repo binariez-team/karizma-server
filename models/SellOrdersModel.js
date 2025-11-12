@@ -1,6 +1,6 @@
 const pool = require("../config/database");
 const Accounts = require("./AccountsModel");
-// const moment = require("moment");
+const Customer = require("./CustomersModel");
 const moment = require("moment-timezone");
 
 class SellOrders {
@@ -150,6 +150,9 @@ class SellOrders {
 				]);
 
 				let [_531] = await Accounts.getIdByAccountNumber("531");
+				const customer_name = await Customer.getCustomerNameById(
+					payment.customer_id
+				);
 
 				const firstItem = {
 					user_id: user_id,
@@ -160,6 +163,7 @@ class SellOrders {
 					partner_id_fk: null,
 					debit: payment.amount,
 					credit: 0,
+					notes: customer_name,
 				};
 
 				await connection.query(
