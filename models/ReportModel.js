@@ -95,10 +95,6 @@ class ReportModel {
 	}
 
 	static async getTotalPayments(user_id, startDate, endDate) {
-		console.log(startDate);
-		console.log(endDate);
-		console.log(user_id);
-
 		let query = `
         SELECT
         COALESCE(sum(total_value), 0) as totalPayment
@@ -233,11 +229,6 @@ class ReportModel {
                     ji.partner_id_fk
             ) AS customer_balances;`;
 		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
-		console.log(startDate);
-		console.log(endDate);
-		console.log(user_id);
-
-		console.log(result);
 
 		return result;
 	}
@@ -294,18 +285,17 @@ class ReportModel {
 
 	// get total expenses
 	static async getExpenses(startDate, endDate, user_id) {
-		let query = `SELECT
-        SUM(debit) AS totalExpenses
-        FROM journal_items
-        WHERE DATE(journal_date) >= ?
-        AND DATE(journal_date) <= ?
-        AND user_id = ?
-        AND account_id_fk = 8;`;
+		const query = `SELECT
+		SUM(total_value) AS totalExpenses
+		FROM journal_vouchers
+		WHERE user_id = ?
+		AND DATE(journal_date) BETWEEN ? AND ?
+		AND is_deleted = 0 AND journal_number LIKE 'EXP%'`;
 
 		let [[results]] = await pool.query(query, [
+			user_id,
 			startDate,
 			endDate,
-			user_id,
 		]);
 
 		return results;
@@ -387,104 +377,6 @@ class ReportModel {
 		let [results] = await pool.query(query, [startDate, endDate, user_id]);
 		return results;
 	}
-
-	// sales analytics
-	// static async getSalesAnalytics(startDate, endDate) {
-	// 	const query = `SELECT
-	//         p.product_id,
-	//         p.sku,
-	//         p.product_name,
-	//         COALESCE(pur.total_purchased, 0) AS total_purchased,
-	//         COALESCE(added.quantity, 0) AS total_added,
-
-	//         COALESCE(removed.quantity, 0) AS total_removed,
-	//         COALESCE(sal.total_sold, 0) AS total_sold,
-
-	//         COALESCE(pur.total_purchased, 0) + COALESCE(added.quantity, 0)  - COALESCE(removed.quantity, 0) - COALESCE(sal.total_sold, 0) AS remaining_stock,
-
-	//         COALESCE(it.stock_quantity, 0) AS actual_stock
-	//     FROM products p
-
-	//     LEFT JOIN (
-	//             SELECT
-	//                 poi.product_id_fk,
-	//                 SUM(poi.quantity) AS total_purchased
-	//             FROM purchase_order_items poi
-	//             INNER JOIN purchase_orders po ON po.order_id = poi.order_id_fk
-	//             WHERE poi.is_deleted = 0 AND po.is_deleted = 0 AND DATE(po.order_datetime) BETWEEN ? AND ?
-	//             GROUP BY poi.product_id_fk
-	//         ) pur ON pur.product_id_fk = p.product_id AND p.stock_management = 1
-
-	//     LEFT JOIN (
-	//     	SELECT
-	//                 product_id_fk,
-	//                 + SUM(CASE WHEN transaction_type = 'ADD' THEN quantity ELSE 0 END)
-	//                 AS quantity
-	//             FROM inventory_transactions
-	//             WHERE is_deleted = 0 AND DATE(transaction_datetime) BETWEEN ? AND ?
-	//             GROUP BY product_id_fk
-	//     	) added ON p.product_id = added.product_id_fk AND p.stock_management = 1
-
-	//     LEFT JOIN (
-	//         SELECT
-	//                 product_id_fk,
-	//                 + SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END)
-	//                 AS quantity
-	//             FROM inventory_transactions
-	//             WHERE is_deleted = 0 AND DATE(transaction_datetime) BETWEEN ? AND ?
-	//             GROUP BY product_id_fk
-	//         ) deleted ON p.product_id = deleted.product_id_fk AND p.stock_management = 1
-
-	//     LEFT JOIN (
-	//         SELECT
-	//             product_id_fk,
-	//             SUM(CASE WHEN transaction_type = 'REMOVE' THEN ABS(quantity) ELSE 0 END)
-	//             AS quantity
-	//         FROM inventory_transactions
-	//         WHERE is_deleted = 0 AND DATE(transaction_datetime) BETWEEN ? AND ?
-	//         GROUP BY product_id_fk
-	//     ) removed ON p.product_id = removed.product_id_fk AND p.stock_management = 1
-
-	//     LEFT JOIN (
-	//         SELECT
-	//             soi.product_id,
-	//             SUM(soi.quantity) AS total_sold
-	//         FROM sales_order_items soi
-	//         INNER JOIN sales_orders so ON so.order_id = soi.order_id
-	//         WHERE soi.is_deleted = 0 AND so.is_deleted = 0 AND DATE(so.order_datetime) BETWEEN ? AND ?
-	//         GROUP BY soi.product_id
-	//     ) sal ON sal.product_id = p.product_id AND p.stock_management = 1
-
-	//     LEFT JOIN (
-	//         SELECT product_id_fk, SUM(quantity) AS stock_quantity
-	//         FROM inventory_transactions
-	//         GROUP BY product_id_fk
-	//     ) it ON it.product_id_fk = p.product_id AND p.stock_management = 1
-
-	//     WHERE p.is_deleted = 0
-	//     AND p.stock_management = 1
-	//     HAVING
-	//         COALESCE(total_purchased, 0) > 0
-	//         OR COALESCE(total_added, 0) > 0
-	//         OR COALESCE(total_removed, 0) > 0
-	//         OR COALESCE(total_sold, 0) > 0
-	//     ORDER BY p.product_id`;
-
-	// 	let [results] = await pool.query(query, [
-	// 		startDate,
-	// 		endDate,
-	// 		startDate,
-	// 		endDate,
-	// 		startDate,
-	// 		endDate,
-	// 		startDate,
-	// 		endDate,
-	// 		startDate,
-	// 		endDate,
-	// 	]);
-
-	// 	return results;
-	// }
 }
 
 module.exports = ReportModel;
