@@ -45,6 +45,18 @@ exports.getReturns = async (req, res, next) => {
 	}
 };
 
+exports.getDisposes = async (req, res, next) => {
+	try {
+		// getDisposes
+		const { start, end } = req.params;
+		const { user_id } = req.user;
+		const result = await Reports.getDisposes(start, end, user_id);
+		res.json(result);
+	} catch (error) {
+		next(error);
+	}
+};
+
 exports.getTotalOrders = async (req, res, next) => {
 	try {
 		const { start, end } = req.params;

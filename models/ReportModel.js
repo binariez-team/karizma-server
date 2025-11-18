@@ -377,6 +377,22 @@ class ReportModel {
 		let [results] = await pool.query(query, [startDate, endDate, user_id]);
 		return results;
 	}
+
+	static async getDisposes(startDate, endDate, user_id) {
+		const query = `SELECT SUM(total_cost) total_disposes
+		FROM dispose_products
+		WHERE dispose_datetime BETWEEN ? AND ? 
+		AND user_id = ?
+		AND is_deleted = 0`;
+
+		let [[results]] = await pool.query(query, [
+			startDate,
+			endDate,
+			user_id,
+		]);
+
+		return results;
+	}
 }
 
 module.exports = ReportModel;
