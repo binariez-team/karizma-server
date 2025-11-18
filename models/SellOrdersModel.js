@@ -129,7 +129,7 @@ class SellOrders {
 				// payment.payment_date = moment(payment.payment_date).format(
 				// 	`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
 				// );
-				payment.payment_date = moment(payment.payment_date)
+				payment.payment_date = moment(order.order_datetime)
 					.add(1, "seconds")
 					.format(`YYYY-MM-DD HH:mm:ss`);
 
