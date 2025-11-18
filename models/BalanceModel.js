@@ -135,9 +135,9 @@ class BalanceModel {
 			);
 
 			//insert to vouchers and journal_items
-			let query = `UPDATE journal_vouchers SET journal_date = ? ,  total_value = ? WHERE journal_id = ? and user_id = ?`;
+			let query = `UPDATE journal_vouchers SET total_value = ? WHERE journal_id = ? and user_id = ?`;
 			const [journal_voucher] = await connection.query(query, [
-				paymentData.payment_date,
+				// paymentData.payment_date,
 				paymentData.amount,
 				paymentData.journal_id,
 				user_id,
@@ -146,23 +146,13 @@ class BalanceModel {
 			let [_531] = await Account.getIdByAccountNumber("531");
 
 			await connection.query(
-				`UPDATE journal_items SET credit=?, journal_date=? WHERE journal_id_fk=? AND user_id!=?`,
-				[
-					paymentData.amount,
-					paymentData.payment_date,
-					paymentData.journal_id,
-					user_id,
-				]
+				`UPDATE journal_items SET debit = ? WHERE journal_id_fk = ? AND user_id != ?`,
+				[paymentData.amount, paymentData.journal_id, user_id]
 			);
 
 			await connection.query(
-				`UPDATE journal_items SET debit=?, journal_date=? WHERE journal_id_fk=? AND user_id=?`,
-				[
-					paymentData.amount,
-					paymentData.payment_date,
-					paymentData.journal_id,
-					user_id,
-				]
+				`UPDATE journal_items SET credit = WHERE journal_id_fk = ? AND user_id = ?`,
+				[paymentData.amount, paymentData.journal_id, user_id]
 			);
 
 			await connection.commit();
