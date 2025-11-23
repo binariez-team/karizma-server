@@ -10,15 +10,14 @@ const { google } = require('googleapis');
 const backupsFolder = path.join(__dirname, 'backups');
 if (!fs.existsSync(backupsFolder)) fs.mkdirSync(backupsFolder);
 
-// Google Drive Auth - Service Account
-const auth = new google.auth.GoogleAuth({
-    credentials: {
-        private_key: process.env.GOOGLE_SERVICE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-        client_email: process.env.GOOGLE_SERVICE_CLIENT_EMAIL,
-    },
-    scopes: ['https://www.googleapis.com/auth/drive.file']
-});
-const drive = google.drive({ version: 'v3', auth });
+// Google Drive Auth - OAuth2 with refresh token
+const oAuth2Client = new google.auth.OAuth2(
+    process.env.OAUTH_CLIENT_ID,
+    process.env.OAUTH_CLIENT_SECRET
+);
+oAuth2Client.setCredentials({ refresh_token: process.env.OAUTH_REFRESH_TOKEN });
+
+const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
 // Upload file to Google Drive
 async function uploadToDrive(filePath, fileName) {
