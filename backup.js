@@ -2,14 +2,19 @@ require('dotenv').config();
 const cron = require('node-cron');
 const mysqldump = require('mysqldump');
 const path = require('path');
+const fs = require('fs');
+
+// Ensure backups folder exists
+const backupsFolder = path.join(__dirname, 'backups');
+if (!fs.existsSync(backupsFolder)) fs.mkdirSync(backupsFolder);
 
 // Backup function
 function backupDatabase() {
     const now = new Date();
     const timestamp = now.toISOString().replace(/T/, '-').replace(/:/g, '-').replace(/\..+/, '');
-    const outputPath = path.join(__dirname, 'backups', `backup-${timestamp}.sql`);
+    const outputPath = path.join(backupsFolder, `backup-${timestamp}.sql`);
 
-    console.log(`Backup started at: ${timestamp}`);
+    console.log(`📀 Backup started: ${timestamp}`);
 
     mysqldump({
         connection: {
@@ -20,23 +25,29 @@ function backupDatabase() {
         },
         dumpToFile: outputPath,
     }).then(() => {
-        console.log(`Backup completed: ${outputPath}`);
+        console.log(`✅ Backup completed: ${outputPath}`);
     }).catch(err => {
-        console.error("Backup failed:", err);
+        console.error("❌ Backup failed:", err.message);
     });
 }
 
-// Ensure backups folder exists
-const fs = require('fs');
-const backupsFolder = path.join(__dirname, 'backups');
-if (!fs.existsSync(backupsFolder)) fs.mkdirSync(backupsFolder);
 
-// 🔹 Run twice per day → 4:00 PM & 12:00 AM (Beirut Time)
-cron.schedule('0 0,16 * * *', () => {
-    console.log("Running scheduled backup...");
+// Start cron + immediate first backup
+function initBackupCron() {
+    console.log("💡 Backup cron initializing...");
+
+    // 🔹 Immediate backup when server starts
     backupDatabase();
-}, {
-    timezone: "Asia/Beirut"
-});
 
-console.log("Cron job scheduled successfully!");
+    // 🔹 Scheduled backups: 12 AM + 4 PM Beirut time
+    cron.schedule('0 0,16 * * *', () => {
+        console.log("⏱ Running scheduled backup job...");
+        backupDatabase();
+    }, {
+        timezone: "Asia/Beirut"
+    });
+
+    console.log("⏳ Scheduled backup jobs set!");
+}
+
+module.exports = initBackupCron;

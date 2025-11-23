@@ -3,6 +3,10 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
+const initBackupCron = require('./backup'); // 👈 Import cron module
+
+initBackupCron(); // 👈 Initialize the backup cron job
+
 // allow Cross-Origin calls to this app
 const cors = require("cors");
 app.use(cors());
