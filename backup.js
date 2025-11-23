@@ -49,7 +49,7 @@ async function backupDatabase() {
     // Beirut timezone timestamp for filenames
     const timestamp = now.toLocaleString('sv-SE', { 
         timeZone: 'Asia/Beirut', 
-        hour12: true 
+        hour12: false 
     }).replace(/ /g, 'T').replace(/:/g, '-');
 
     const sqlFileName = `backup-${timestamp}.sql`;
