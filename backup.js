@@ -46,15 +46,14 @@ async function uploadToDrive(filePath, fileName) {
 async function backupDatabase() {
     const now = new Date();
 
-    // Beirut timezone timestamp for filenames
-    const timestamp = now.toLocaleString('en-US', { 
-    timeZone: 'Asia/Beirut', 
-    hour12: true 
-})
-.replace(/:/g, '-')     // replace colon with dash for filename safety
-.replace(/,/g, '')      // remove commas
-.replace(/ /g, '_');    // replace spaces with underscores
-
+    // Beirut timezone, 12-hour format with AM/PM, safe for filenames
+    const timestamp = now.toLocaleString('en-US', {
+        timeZone: 'Asia/Beirut',
+        hour12: true
+    })
+    .replace(/:/g, '-')   // replace colon with dash
+    .replace(/,/g, '')    // remove commas
+    .replace(/ /g, '_');  // replace spaces with underscores
 
     const sqlFileName = `backup-${timestamp}.sql`;
     const sqlFilePath = path.join(backupsFolder, sqlFileName);
