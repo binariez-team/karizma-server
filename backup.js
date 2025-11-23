@@ -47,10 +47,14 @@ async function backupDatabase() {
     const now = new Date();
 
     // Beirut timezone timestamp for filenames
-    const timestamp = now.toLocaleString('sv-SE', { 
-        timeZone: 'Asia/Beirut', 
-        hour12: false 
-    }).replace(/ /g, 'T').replace(/:/g, '-');
+    const timestamp = now.toLocaleString('en-US', { 
+    timeZone: 'Asia/Beirut', 
+    hour12: true 
+})
+.replace(/:/g, '-')     // replace colon with dash for filename safety
+.replace(/,/g, '')      // remove commas
+.replace(/ /g, '_');    // replace spaces with underscores
+
 
     const sqlFileName = `backup-${timestamp}.sql`;
     const sqlFilePath = path.join(backupsFolder, sqlFileName);
