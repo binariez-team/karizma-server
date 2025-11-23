@@ -45,7 +45,13 @@ async function uploadToDrive(filePath, fileName) {
 // Backup DB then compress & upload
 async function backupDatabase() {
     const now = new Date();
-    const timestamp = now.toISOString().replace(/T/, '-').replace(/:/g, '-').replace(/\..+/, '');
+
+    // Beirut timezone timestamp for filenames
+    const timestamp = now.toLocaleString('sv-SE', { 
+        timeZone: 'Asia/Beirut', 
+        hour12: false 
+    }).replace(/ /g, 'T').replace(/:/g, '-');
+
     const sqlFileName = `backup-${timestamp}.sql`;
     const sqlFilePath = path.join(backupsFolder, sqlFileName);
     const zipFileName = `${sqlFileName}.gz`;
@@ -54,6 +60,7 @@ async function backupDatabase() {
     console.log(`📀 Backup started: ${timestamp}`);
 
     try {
+        // Dump MySQL database
         await mysqldump({
             connection: {
                 host: process.env.DB_HOST,
@@ -77,6 +84,7 @@ async function backupDatabase() {
             // Remove original .sql after compress
             fs.unlinkSync(sqlFilePath);
 
+            // Upload to Google Drive
             await uploadToDrive(zipFilePath, zipFileName);
         });
 
