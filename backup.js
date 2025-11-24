@@ -6,11 +6,13 @@ const fs = require('fs');
 const zlib = require('zlib');
 const { google } = require('googleapis');
 
+const BACKUP_RETENTION_DAYS = 7;
+
 // Prepare backup directory
 const backupsFolder = path.join(__dirname, 'backups');
 if (!fs.existsSync(backupsFolder)) fs.mkdirSync(backupsFolder);
 
-// Google Drive Auth - OAuth2 with refresh token
+// Google Drive Auth - OAuth2 Refresh Token
 const oAuth2Client = new google.auth.OAuth2(
     process.env.OAUTH_CLIENT_ID,
     process.env.OAUTH_CLIENT_SECRET
@@ -19,48 +21,103 @@ oAuth2Client.setCredentials({ refresh_token: process.env.OAUTH_REFRESH_TOKEN });
 
 const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
-// Upload file to Google Drive
+// 🕒 Generate Beirut timestamp (AM/PM, safe for filename)
+// function timestamp() {
+//     return new Date()
+//         .toLocaleString('en-US', { timeZone: 'Asia/Beirut', hour12: true })
+//         .replace(/\//g, '-') 
+//         .replace(/:/g, '-')
+//         .replace(/,/g, '')
+//         .replace(/ /g, '_');
+// }
+
+// Convert date to Beirut timezone correctly
+function beirutDate() {
+    return new Date().toLocaleString("en-US", { timeZone: "Asia/Beirut" });
+}
+
+// Generate file timestamp - YYYY-MM-DD_HH-MM-SS_AM
+function timestamp() {
+    const date = new Date(beirutDate());
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    let hours = date.getHours();
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+
+    const ampm = hours >= 12 ? "PM" : "AM";
+    hours = hours % 12 || 12;
+    hours = String(hours).padStart(2, "0");
+
+    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}_${ampm}`;
+}
+
+// ☁ Upload to Google Drive
 async function uploadToDrive(filePath, fileName) {
-    const fileMetadata = {
-        name: fileName,
-        parents: process.env.DRIVE_FOLDER_ID ? [process.env.DRIVE_FOLDER_ID] : []
-    };
-
-    const media = {
-        body: fs.createReadStream(filePath)
-    };
-
     try {
         const res = await drive.files.create({
-            resource: fileMetadata,
-            media: media,
-            fields: 'id'
+            resource: {
+                name: fileName,
+                parents: [process.env.DRIVE_FOLDER_ID]
+            },
+            media: { body: fs.createReadStream(filePath) },
+            fields: 'id, createdTime'
         });
-        console.log(`☁️ Uploaded to Google Drive → File ID: ${res.data.id}`);
+        console.log(`☁️ Uploaded to Drive: ${fileName}`);
+        return res.data.id;
     } catch (error) {
-        console.error('❌ Google Drive Upload Error:', error.message);
+        console.error("❌ Drive Upload Error:", error.message);
     }
 }
 
-// Backup DB then compress & upload
-async function backupDatabase() {
-    const now = new Date();
+// 🧹 Cleanup Local Backups
+function cleanupLocalBackups() {
+    const cutoff = Date.now() - BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-    // Beirut timezone timestamp for filenames
-    const timestamp = now.toLocaleString('sv-SE', { 
-        timeZone: 'Asia/Beirut', 
-        hour12: false 
-    }).replace(/ /g, 'T').replace(/:/g, '-');
+    fs.readdirSync(backupsFolder).forEach(file => {
+        const filePath = path.join(backupsFolder, file);
+        const stats = fs.statSync(filePath);
 
-    const sqlFileName = `backup-${timestamp}.sql`;
-    const sqlFilePath = path.join(backupsFolder, sqlFileName);
-    const zipFileName = `${sqlFileName}.gz`;
-    const zipFilePath = `${sqlFilePath}.gz`;
+        if (stats.mtimeMs < cutoff) {
+            fs.unlinkSync(filePath);
+            console.log(`🗑 Removed local old backup: ${file}`);
+        }
+    });
+}
 
-    console.log(`📀 Backup started: ${timestamp}`);
+// 🧹 Cleanup Drive backups older than X days
+async function cleanupDriveBackups() {
+    const cutoffDate = new Date(Date.now() - BACKUP_RETENTION_DAYS * 864e5).toISOString();
 
     try {
-        // Dump MySQL database
+        const list = await drive.files.list({
+            q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false`,
+            fields: 'files(id, name, createdTime)'
+        });
+
+        for (const f of list.data.files) {
+            if (f.createdTime < cutoffDate) {
+                await drive.files.delete({ fileId: f.id });
+                console.log(`☁️🗑 Removed Drive backup: ${f.name}`);
+            }
+        }
+    } catch (err) {
+        console.error("❌ Drive Cleanup Error:", err.message);
+    }
+}
+
+// 📦 Backup DB → Compress → Upload → Cleanup
+async function backupDatabase() {
+    const time = timestamp();
+    const sqlFile = `backup-${time}.sql`;
+    const sqlPath = path.join(backupsFolder, sqlFile);
+    const gzFile = `${sqlFile}.gz`;
+    const gzPath = `${sqlPath}.gz`;
+
+    console.log(`📀 Backup started: ${time}`);
+
+    try {
         await mysqldump({
             connection: {
                 host: process.env.DB_HOST,
@@ -68,47 +125,44 @@ async function backupDatabase() {
                 password: process.env.DB_PASS,
                 database: process.env.DB_NAME,
             },
-            dumpToFile: sqlFilePath
+            dumpToFile: sqlPath
         });
 
-        console.log(`✔ SQL backup saved: ${sqlFilePath}`);
+        console.log(`✔ SQL saved locally`);
 
-        // GZIP compression
         const gzip = zlib.createGzip();
-        const source = fs.createReadStream(sqlFilePath);
-        const destination = fs.createWriteStream(zipFilePath);
+        fs.createReadStream(sqlPath)
+            .pipe(gzip)
+            .pipe(fs.createWriteStream(gzPath))
+            .on('finish', async () => {
+                console.log(`🗜 Created compressed backup`);
 
-        source.pipe(gzip).pipe(destination).on('finish', async () => {
-            console.log(`🗜 Compressed backup created: ${zipFilePath}`);
+                fs.unlinkSync(sqlPath);
 
-            // Remove original .sql after compress
-            fs.unlinkSync(sqlFilePath);
+                await uploadToDrive(gzPath, gzFile);
 
-            // Upload to Google Drive
-            await uploadToDrive(zipFilePath, zipFileName);
-        });
+                await cleanupLocalBackups();
+                await cleanupDriveBackups();
+            });
 
     } catch (err) {
         console.error("❌ Backup failed:", err.message);
     }
 }
 
-// Initialize cron + immediate first backup
+// 🎯 Cron init
 function initBackupCron() {
     console.log("🔁 Initializing backup cron...");
 
-    // Backup immediately when server starts
+    // Run once at startup
     backupDatabase();
 
-    // Schedule backups → 12:00 AM & 4:00 PM (Asia/Beirut)
-    cron.schedule('0 0,16 * * *', () => {
-        console.log("⏱ Running scheduled backup job...");
-        backupDatabase();
-    }, {
+    // Schedule → 12AM, 12PM, 3PM, 6PM Beirut
+    cron.schedule('0 0,12,15,18 * * *', backupDatabase, {
         timezone: "Asia/Beirut"
     });
 
-    console.log("🕒 Scheduled backup jobs active!");
+    console.log("🕒 Scheduled jobs active ✔");
 }
 
 module.exports = initBackupCron;
