@@ -6,7 +6,7 @@ const fs = require('fs');
 const zlib = require('zlib');
 const { google } = require('googleapis');
 
-const BACKUP_RETENTION_DAYS = 7;
+const BACKUP_RETENTION_DAYS = 2;
 
 // Prepare backup directory
 const backupsFolder = path.join(__dirname, 'backups');
@@ -110,7 +110,7 @@ async function cleanupDriveBackups() {
 // 📦 Backup DB → Compress → Upload → Cleanup
 async function backupDatabase() {
     const time = timestamp();
-    const sqlFile = `backup-${time}.sql`;
+    const sqlFile = `karizma-${time}.sql`;
     const sqlPath = path.join(backupsFolder, sqlFile);
     const gzFile = `${sqlFile}.gz`;
     const gzPath = `${sqlPath}.gz`;
