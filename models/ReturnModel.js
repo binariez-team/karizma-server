@@ -90,7 +90,7 @@ class ReturnModel {
 			});
 			//insert order_items
 			await connection.query(
-				`INSERT INTO return_order_items (order_id, product_id, quantity,  unit_price, price_type,unit_cost, total_price ) VALUES ?`,
+				`INSERT INTO return_order_items (order_id, product_id, quantity, unit_price, price_type, unit_cost, avg_cost, total_price) VALUES ?`,
 				[invoice_map]
 			);
 
@@ -317,7 +317,7 @@ class ReturnModel {
 			});
 
 			const [new_order] = await connection.query(
-				`INSERT INTO return_order_items (order_id, product_id, quantity,  unit_price, price_type,unit_cost, total_price ) VALUES ?`,
+				`INSERT INTO return_order_items (order_id, product_id, quantity,  unit_price, price_type, unit_cost, avg_cost, total_price ) VALUES ?`,
 				[invoice_map]
 			);
 
