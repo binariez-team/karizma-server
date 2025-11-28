@@ -6,7 +6,8 @@ const fs = require('fs');
 const zlib = require('zlib');
 const { google } = require('googleapis');
 
-const BACKUP_RETENTION_DAYS = 2;
+const BACKUP_RETENTION_DAYS = process.env.BACKUP_RETENTION_DAYS;
+const BACKUP_NAME = process.env.BACKUP_NAME;
 
 // Prepare backup directory
 const backupsFolder = path.join(__dirname, 'backups');
@@ -46,11 +47,11 @@ function timestamp() {
     const minutes = String(date.getMinutes()).padStart(2, "0");
     const seconds = String(date.getSeconds()).padStart(2, "0");
 
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12 || 12;
-    hours = String(hours).padStart(2, "0");
+    // const ampm = hours >= 12 ? "PM" : "AM";
+    // hours = hours % 12 || 12;
+    // hours = String(hours).padStart(2, "0");
 
-    return `${year}-${month}-${day}_${hours}-${minutes}-${seconds}_${ampm}`;
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
 }
 
 // ☁ Upload to Google Drive
@@ -110,7 +111,7 @@ async function cleanupDriveBackups() {
 // 📦 Backup DB → Compress → Upload → Cleanup
 async function backupDatabase() {
     const time = timestamp();
-    const sqlFile = `karizma-${time}.sql`;
+    const sqlFile = `${BACKUP_NAME}_${time}.sql`;
     const sqlPath = path.join(backupsFolder, sqlFile);
     const gzFile = `${sqlFile}.gz`;
     const gzPath = `${sqlPath}.gz`;
