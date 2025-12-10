@@ -3,7 +3,7 @@ const router = express.Router();
 
 const ReportController = require("../controllers/Reports.controller");
 
-router.get("/total-sales/:start/:end", ReportController.getTotalSales);
+// router.get("/total-sales/:start/:end", ReportController.getTotalSales);
 
 router.get("/stock-value", ReportController.getStockValue);
 
@@ -27,20 +27,20 @@ router.get("/debts/:start&:end", ReportController.getDebts);
 
 // customer payments
 router.get(
-	"/customer-payments/:start&:end",
-	ReportController.getCustomerPayments
+    "/customer-payments/:start&:end",
+    ReportController.getCustomerPayments
 );
 
 // supplier payments
 router.get(
-	"/supplier-payments/:start&:end",
-	ReportController.getSupplierPayments
+    "/supplier-payments/:start&:end",
+    ReportController.getSupplierPayments
 );
 
 // get manual cash transactions
 router.get(
-	"/manual-cash/:start&:end",
-	ReportController.getManualCashTransactions
+    "/manual-cash/:start&:end",
+    ReportController.getManualCashTransactions
 );
 
 // cash balance

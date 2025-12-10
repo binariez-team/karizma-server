@@ -3,10 +3,6 @@ const express = require("express");
 const app = express();
 app.use(express.json());
 
-const initBackupCron = require('./backup'); // 👈 Import cron module
-
-initBackupCron(); // 👈 Initialize the backup cron job
-
 // allow Cross-Origin calls to this app
 const cors = require("cors");
 app.use(cors());
@@ -16,9 +12,9 @@ const http = require("http");
 const socketIO = require("socket.io");
 const server = http.createServer(app); // Create server from Express app
 const io = socketIO(server, {
-	cors: {
-		origins: ["*"],
-	},
+    cors: {
+        origins: ["*"],
+    },
 });
 
 const path = require("path");
@@ -47,8 +43,8 @@ const ReturnRoutes = require("./routes/return.routes");
 const PurchaseRoutes = require("./routes/purchase-orders.routes");
 
 app.use((req, res, next) => {
-	req.io = io;
-	next();
+    req.io = io;
+    next();
 });
 
 // common routes
@@ -63,6 +59,7 @@ app.use("/expense", auth, ExpenseRoutes);
 app.use("/report", auth, ReportRoutes);
 app.use("/return", auth, ReturnRoutes);
 app.use("/dispose", auth, require("./routes/dispose.routes"));
+app.use("/staff", auth, require("./routes/staff.routes"));
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);
@@ -79,13 +76,17 @@ app.use("/user-deliver", auth, require("./routes/user-deliver.routes"));
 
 // check API status page
 app.get("/", (req, res) => {
-	res.sendFile(path.join(__dirname, "public", "index.html"));
+    res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
 // handle errors
 app.use(errorHandler);
 
+const initBackupCron = require("./backup"); // Import cron module
+
+// initBackupCron(); // Initialize the backup cron job
+
+// start server
 server.listen(process.env.PORT, () =>
-	console.log(`listening on port ${process.env.PORT} ...`)
+    console.log(`listening on port ${process.env.PORT} ...`)
 );
-// module.exports = server;

@@ -2,23 +2,23 @@ const pool = require("../config/database");
 const moment = require("moment-timezone");
 
 class History {
-	// get product history
-	static async getProductHistoryById(product_id, user_id) {
-		// const query = `SELECT
-		// 	T.*,
-		// 	SUM(T.quantity) OVER (
-		// 		PARTITION BY T.product_id_fk
-		// 		ORDER BY T.transaction_datetime
-		// 		ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-		// 	) AS balance
-		// 	FROM inventory_transactions T
-		// 	WHERE T.product_id_fk = ?
-		// 	AND user_id_fk = ?
-		// 	AND T.is_deleted = 0
-		// 	ORDER BY T.transaction_datetime DESC
-		// 	LIMIT 100000;`;
+    // get product history
+    static async getProductHistoryById(product_id, database_id) {
+        // const query = `SELECT
+        // 	T.*,
+        // 	SUM(T.quantity) OVER (
+        // 		PARTITION BY T.product_id_fk
+        // 		ORDER BY T.transaction_datetime
+        // 		ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+        // 	) AS balance
+        // 	FROM inventory_transactions T
+        // 	WHERE T.product_id_fk = ?
+        // 	AND database_id = ?
+        // 	AND T.is_deleted = 0
+        // 	ORDER BY T.transaction_datetime DESC
+        // 	LIMIT 100000;`;
 
-		const query = `SELECT
+        const query = `SELECT
 			final.*,
 			A.name AS account_name
 		FROM (
@@ -41,7 +41,7 @@ class History {
 					) AS balance
 				FROM inventory_transactions T
 				WHERE T.product_id_fk = ?
-                AND T.user_id_fk = ?
+                AND T.database_id = ?
 				AND T.is_deleted = 0
 			) AS sub
 			LEFT JOIN sales_orders SO 
@@ -58,26 +58,26 @@ class History {
 			ON final.account_id = A.account_id
 		ORDER BY final.transaction_datetime DESC
 		LIMIT 10000;`;
-		let [rows] = await pool.query(query, [product_id, user_id]);
-		return rows;
-	}
+        let [rows] = await pool.query(query, [product_id, database_id]);
+        return rows;
+    }
 
-	// fetch order items by order id
-	static async fetchOrderItemsById(ids) {
-		let query = `SELECT
+    // fetch order items by order id
+    static async fetchOrderItemsById(ids) {
+        let query = `SELECT
             I.*,
             P.product_name
             FROM sales_order_items I
             INNER JOIN products P ON I.product_id = P.product_id
             WHERE I.is_deleted = 0
             AND order_id IN (?)`;
-		let [results] = await pool.query(query, [ids]);
-		return results;
-	}
+        let [results] = await pool.query(query, [ids]);
+        return results;
+    }
 
-	// fetch sales invoices
-	static async fetchSalesHistory(user_id, criteria) {
-		let sql = `SELECT
+    // fetch sales invoices
+    static async fetchSalesHistory(database_id, criteria) {
+        let sql = `SELECT
                 A.name AS customer_name,
                 A.phone AS customer_phone,
                 A.address AS customer_address,
@@ -88,105 +88,105 @@ class History {
             INNER JOIN sales_order_items M ON O.order_id = M.order_id
             INNER JOIN products S ON S.product_id = M.product_id
             INNER JOIN accounts  A ON O.customer_id = A.account_id
-            WHERE O.is_deleted = 0 AND A.user_id = ? `;
-		const params = [user_id];
-		if (criteria.invoice_number) {
-			sql += ` AND O.invoice_number LIKE ?`;
-			params.push(`%${criteria.invoice_number}`);
-		}
-		if (criteria.customer_id) {
-			sql += ` AND O.customer_id = ?`;
-			params.push(criteria.customer_id);
-		}
-		if (criteria.invoice_date) {
-			sql += ` AND DATE(order_datetime) = ?`;
-			params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
-		}
+            WHERE O.is_deleted = 0 AND A.database_id = ? `;
+        const params = [database_id];
+        if (criteria.invoice_number) {
+            sql += ` AND O.invoice_number LIKE ?`;
+            params.push(`%${criteria.invoice_number}`);
+        }
+        if (criteria.customer_id) {
+            sql += ` AND O.customer_id = ?`;
+            params.push(criteria.customer_id);
+        }
+        if (criteria.invoice_date) {
+            sql += ` AND DATE(order_datetime) = ?`;
+            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        }
 
-		sql += ` GROUP BY O.order_id
+        sql += ` GROUP BY O.order_id
         ORDER BY order_date DESC, O.invoice_number DESC
         LIMIT ? OFFSET ?`;
-		params.push(criteria.limit || 100);
-		params.push(criteria.offset || 0);
+        params.push(criteria.limit || 100);
+        params.push(criteria.offset || 0);
 
-		const [rows] = await pool.query(sql, params);
-		return rows;
-	}
+        const [rows] = await pool.query(sql, params);
+        return rows;
+    }
 
-	// fetch products sales history
-	static async fetchProductsSalesHistory(user_id, criteria) {
-		let sql = `SELECT soi.*, p.sku, p.product_name, a.name AS customer_name, so.invoice_number, so.order_datetime 
+    // fetch products sales history
+    static async fetchProductsSalesHistory(database_id, criteria) {
+        let sql = `SELECT soi.*, p.sku, p.product_name, a.name AS customer_name, so.invoice_number, so.order_datetime 
 			FROM sales_order_items soi 
 			INNER JOIN sales_orders so ON soi.order_id = so.order_id
 			INNER JOIN products p ON soi.product_id = p.product_id
 			INNER JOIN accounts a ON so.customer_id = a.account_id
 
 			WHERE soi.is_deleted = 0 
-			AND so.user_id = ? `;
-		const params = [user_id];
-		if (criteria.customer_id) {
-			sql += ` AND so.customer_id = ?`;
-			params.push(criteria.customer_id);
-		}
-		if (criteria.product_id) {
-			sql += ` AND soi.product_id = ?`;
-			params.push(criteria.product_id);
-		}
-		if (criteria.invoice_number) {
-			sql += ` AND so.invoice_number LIKE ?`;
-			params.push(`%${criteria.invoice_number}`);
-		}
-		if (criteria.invoice_date) {
-			sql += ` AND DATE(order_datetime) = ?`;
-			params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
-		}
+			AND so.database_id = ? `;
+        const params = [database_id];
+        if (criteria.customer_id) {
+            sql += ` AND so.customer_id = ?`;
+            params.push(criteria.customer_id);
+        }
+        if (criteria.product_id) {
+            sql += ` AND soi.product_id = ?`;
+            params.push(criteria.product_id);
+        }
+        if (criteria.invoice_number) {
+            sql += ` AND so.invoice_number LIKE ?`;
+            params.push(`%${criteria.invoice_number}`);
+        }
+        if (criteria.invoice_date) {
+            sql += ` AND DATE(order_datetime) = ?`;
+            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        }
 
-		sql += ` ORDER BY order_datetime DESC`;
-		params.push(criteria.limit || 1000);
+        sql += ` ORDER BY order_datetime DESC`;
+        params.push(criteria.limit || 1000);
 
-		const [rows] = await pool.query(sql, params);
-		return rows;
-	}
+        const [rows] = await pool.query(sql, params);
+        return rows;
+    }
 
-	// fetch deliver invoices
-	// static async fetchDeliverHistory(criteria) {
-	// 	let sql = `SELECT
-	//             U.first_name AS first_name,
-	//             O.*,
-	//             DATE(O.order_datetime) AS order_date,
-	//             JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
-	//         	FROM deliver_orders O
-	//         	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
-	// 			INNER JOIN products S ON S.product_id = M.product_id
-	// 			INNER JOIN users U ON O.user_id_fk = U.user_id
-	// 			WHERE O.is_deleted = 0 `;
-	// 	const params = [];
-	// 	if (criteria.invoice_number) {
-	// 		sql += ` AND O.invoice_number = ?`;
-	// 		params.push(criteria.invoice_number);
-	// 	}
-	// 	if (criteria.user_id) {
-	// 		sql += ` AND O.user_id_fk = ?`;
-	// 		params.push(criteria.user_id);
-	// 	}
-	// 	if (criteria.order_date) {
-	// 		sql += ` AND DATE(order_datetime) = ?`;
-	// 		params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
-	// 	}
+    // fetch deliver invoices
+    // static async fetchDeliverHistory(criteria) {
+    // 	let sql = `SELECT
+    //             U.first_name AS first_name,
+    //             O.*,
+    //             DATE(O.order_datetime) AS order_date,
+    //             JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
+    //         	FROM deliver_orders O
+    //         	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
+    // 			INNER JOIN products S ON S.product_id = M.product_id
+    // 			INNER JOIN users U ON O.database_id = U.database_id
+    // 			WHERE O.is_deleted = 0 `;
+    // 	const params = [];
+    // 	if (criteria.invoice_number) {
+    // 		sql += ` AND O.invoice_number = ?`;
+    // 		params.push(criteria.invoice_number);
+    // 	}
+    // 	if (criteria.database_id) {
+    // 		sql += ` AND O.database_id = ?`;
+    // 		params.push(criteria.database_id);
+    // 	}
+    // 	if (criteria.order_date) {
+    // 		sql += ` AND DATE(order_datetime) = ?`;
+    // 		params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
+    // 	}
 
-	// 	sql += ` GROUP BY O.order_id
-	//     ORDER BY order_date DESC, O.invoice_number DESC
-	//     LIMIT ? OFFSET ?`;
-	// 	params.push(criteria.limit || 100);
-	// 	params.push(criteria.offset || 0);
+    // 	sql += ` GROUP BY O.order_id
+    //     ORDER BY order_date DESC, O.invoice_number DESC
+    //     LIMIT ? OFFSET ?`;
+    // 	params.push(criteria.limit || 100);
+    // 	params.push(criteria.offset || 0);
 
-	// 	const [rows] = await pool.query(sql, params);
-	// 	return rows;
-	// }
+    // 	const [rows] = await pool.query(sql, params);
+    // 	return rows;
+    // }
 
-	//fetch payment history
-	static async fetchPaymentHistory(user_id, criteria) {
-		let sql = `SELECT
+    //fetch payment history
+    static async fetchPaymentHistory(database_id, criteria) {
+        let sql = `SELECT
 				A.name AS partner_name,
 				A.name AS customer_name,
 				A.phone AS partner_phone,
@@ -202,33 +202,33 @@ class History {
 			FROM journal_vouchers P
 			INNER JOIN journal_items I ON P.journal_id = I.journal_id_fk
 			INNER JOIN accounts A ON I.partner_id_fk = A.account_id
-			WHERE P.is_deleted = 0 AND P.user_id = ? AND journal_description = 'Payment Received'`;
-		const params = [user_id];
-		if (criteria.payment_number) {
-			sql += ` AND P.journal_number LIKE ?`;
-			params.push(`%${criteria.payment_number}`);
-		}
-		if (criteria.partner_id) {
-			sql += ` AND I.partner_id_fk = ?`;
-			params.push(criteria.partner_id);
-		}
-		if (criteria.payment_date) {
-			sql += ` AND DATE(P.journal_date) = ?`;
-			params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
-		}
+			WHERE P.is_deleted = 0 AND P.database_id = ? AND journal_description = 'Payment Received'`;
+        const params = [database_id];
+        if (criteria.payment_number) {
+            sql += ` AND P.journal_number LIKE ?`;
+            params.push(`%${criteria.payment_number}`);
+        }
+        if (criteria.partner_id) {
+            sql += ` AND I.partner_id_fk = ?`;
+            params.push(criteria.partner_id);
+        }
+        if (criteria.payment_date) {
+            sql += ` AND DATE(P.journal_date) = ?`;
+            params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
+        }
 
-		sql += ` ORDER BY payment_date DESC, P.journal_number DESC
+        sql += ` ORDER BY payment_date DESC, P.journal_number DESC
 		LIMIT ? OFFSET ?`;
-		params.push(criteria.limit || 100);
-		params.push(criteria.offset || 0);
+        params.push(criteria.limit || 100);
+        params.push(criteria.offset || 0);
 
-		const [rows] = await pool.query(sql, params);
-		return rows;
-	}
+        const [rows] = await pool.query(sql, params);
+        return rows;
+    }
 
-	//fetch return history
-	static async fetchReturnHistory(user_id, criteria) {
-		let sql = `SELECT
+    //fetch return history
+    static async fetchReturnHistory(database_id, criteria) {
+        let sql = `SELECT
                 A.name AS customer_name,
                 A.phone AS customer_phone,
                 A.address AS customer_address,
@@ -239,73 +239,73 @@ class History {
             INNER JOIN return_order_items M ON RO.order_id = M.order_id
             INNER JOIN products S ON S.product_id = M.product_id
             INNER JOIN accounts  A ON RO.customer_id = A.account_id
-            WHERE RO.is_deleted = 0 AND A.user_id = ? `;
-		const params = [user_id];
-		if (criteria.invoice_number) {
-			sql += ` AND RO.invoice_number = ?`;
-			params.push(criteria.invoice_number);
-		}
-		if (criteria.customer_id) {
-			sql += ` AND RO.customer_id = ?`;
-			params.push(criteria.customer_id);
-		}
-		if (criteria.invoice_date) {
-			sql += ` AND DATE(order_datetime) = ?`;
-			params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
-		}
+            WHERE RO.is_deleted = 0 AND A.database_id = ? `;
+        const params = [database_id];
+        if (criteria.invoice_number) {
+            sql += ` AND RO.invoice_number = ?`;
+            params.push(criteria.invoice_number);
+        }
+        if (criteria.customer_id) {
+            sql += ` AND RO.customer_id = ?`;
+            params.push(criteria.customer_id);
+        }
+        if (criteria.invoice_date) {
+            sql += ` AND DATE(order_datetime) = ?`;
+            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        }
 
-		sql += ` GROUP BY RO.order_id
+        sql += ` GROUP BY RO.order_id
         ORDER BY order_date DESC, RO.invoice_number DESC
         LIMIT ? OFFSET ?`;
-		params.push(criteria.limit || 100);
-		params.push(criteria.offset || 0);
+        params.push(criteria.limit || 100);
+        params.push(criteria.offset || 0);
 
-		const [rows] = await pool.query(sql, params);
-		return rows;
-	}
+        const [rows] = await pool.query(sql, params);
+        return rows;
+    }
 
-	// fetch return order items by order id
-	static async fetchReturnOrderItemsById(ids) {
-		let query = `SELECT
+    // fetch return order items by order id
+    static async fetchReturnOrderItemsById(ids) {
+        let query = `SELECT
             ROI.*,
             P.product_name
             FROM return_order_items ROI
             INNER JOIN products P ON ROI.product_id = P.product_id
             WHERE ROI.is_deleted = 0
             AND order_id IN (?)`;
-		let [results] = await pool.query(query, [ids]);
-		return results;
-	}
+        let [results] = await pool.query(query, [ids]);
+        return results;
+    }
 
-	//fetch products dispose history
-	static async fetchDisposeHistory(user_id, criteria) {
-		let sql = `SELECT 
+    //fetch products dispose history
+    static async fetchDisposeHistory(database_id, criteria) {
+        let sql = `SELECT 
 					DP.*,
 					DATE(DP.dispose_datetime) AS dispose_date,
 					JSON_ARRAYAGG(JSON_OBJECT('product_id', DI.product_id, 'product_name', S.product_name, 'quantity', DI.quantity, 'unit_cost', DI.unit_cost)) items
 				FROM dispose_products DP
 				INNER JOIN dispose_products_items DI ON DP.dispose_id = DI.dispose_id
 				INNER JOIN products S ON S.product_id = DI.product_id
-				WHERE DP.is_deleted = 0 AND DP.user_id = ?`;
-		const params = [user_id];
-		if (criteria.invoice_number) {
-			sql += ` AND DP.invoice_number = ?`;
-			params.push(criteria.invoice_number);
-		}
-		if (criteria.dispose_date) {
-			sql += ` AND DATE(DP.dispose_datetime) = ?`;
-			params.push(moment(criteria.dispose_date).format("yyyy-MM-DD"));
-		}
+				WHERE DP.is_deleted = 0 AND DP.database_id = ?`;
+        const params = [database_id];
+        if (criteria.invoice_number) {
+            sql += ` AND DP.invoice_number = ?`;
+            params.push(criteria.invoice_number);
+        }
+        if (criteria.dispose_date) {
+            sql += ` AND DATE(DP.dispose_datetime) = ?`;
+            params.push(moment(criteria.dispose_date).format("yyyy-MM-DD"));
+        }
 
-		sql += ` GROUP BY DP.dispose_id 
+        sql += ` GROUP BY DP.dispose_id 
 		ORDER BY dispose_date DESC, DP.invoice_number DESC
 			LIMIT ? OFFSET ?`;
-		params.push(criteria.limit || 100);
-		params.push(criteria.offset || 0);
+        params.push(criteria.limit || 100);
+        params.push(criteria.offset || 0);
 
-		const [rows] = await pool.query(sql, params);
-		return rows;
-	}
+        const [rows] = await pool.query(sql, params);
+        return rows;
+    }
 }
 
 module.exports = History;

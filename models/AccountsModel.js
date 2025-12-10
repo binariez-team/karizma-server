@@ -1,13 +1,13 @@
 const pool = require("../config/database");
 
 class Accounts {
-	static async getAccountDetailsById(
-		user_id,
-		account_id,
-		startDate,
-		endDate
-	) {
-		let query = `
+    static async getAccountDetailsById(
+        database_id,
+        account_id,
+        startDate,
+        endDate
+    ) {
+        let query = `
 			WITH partner_balance AS (
 				SELECT
 					SUM(CASE WHEN ji.debit IS NOT NULL THEN ji.debit ELSE 0 END) AS debit,
@@ -20,7 +20,7 @@ class Accounts {
 					ji.partner_id_fk = ?
 					AND Date(jv.journal_date) < ?
 					AND ji.is_deleted = 0
-					AND jv.user_id = ?
+					AND jv.database_id = ?
 			)
 			SELECT
 				NULL AS journal_id,
@@ -63,34 +63,34 @@ class Accounts {
 			ji.partner_id_fk  = ?
 			AND DATE(jv.journal_date) BETWEEN ? AND ?
 			AND ji.is_deleted = 0
-			AND jv.user_id = ?
+			AND jv.database_id = ?
 			)
 			ORDER BY
 			journal_date ASC`;
-		const [rows] = await pool.query(query, [
-			account_id,
-			startDate,
-			user_id,
-			account_id,
-			startDate,
-			endDate,
-			user_id,
-		]);
-		return rows;
-	}
+        const [rows] = await pool.query(query, [
+            account_id,
+            startDate,
+            database_id,
+            account_id,
+            startDate,
+            endDate,
+            database_id,
+        ]);
+        return rows;
+    }
 
-	// get id by account number
-	static async getIdByAccountNumber(number) {
-		const query = `SELECT id FROM chart_of_accounts WHERE account_number = ?`;
-		const [id] = await pool.query(query, number);
-		return id;
-	}
+    // get id by account number
+    static async getIdByAccountNumber(number) {
+        const query = `SELECT id FROM chart_of_accounts WHERE account_number = ?`;
+        const [id] = await pool.query(query, number);
+        return id;
+    }
 
-	//get multi accounts starting with account number
-	static async getAccountsByAccountNumber(account_number) {
-		const query = `SELECT * FROM chart_of_accounts WHERE account_number LIKE ?`;
-		const [rows] = await pool.query(query, account_number);
-		return rows;
-	}
+    //get multi accounts starting with account number
+    static async getAccountsByAccountNumber(account_number) {
+        const query = `SELECT * FROM chart_of_accounts WHERE account_number LIKE ?`;
+        const [rows] = await pool.query(query, account_number);
+        return rows;
+    }
 }
 module.exports = Accounts;

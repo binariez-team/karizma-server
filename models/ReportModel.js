@@ -2,114 +2,9 @@ const pool = require("../config/database");
 const Accounts = require("./AccountsModel");
 
 class ReportModel {
-	static async getTotalSales(user_id, startDate, endDate) {
-		let query = `SELECT
-                COALESCE(SUM(total_amount), 0) AS totalSale,
-                COALESCE(SUM(total_cost), 0) AS totalCost,
-                COALESCE(SUM(total_amount - total_cost), 0) AS grossProfit
-            FROM
-                sales_orders
-            WHERE
-                DATE(order_datetime) >= ?
-                AND DATE(order_datetime) <= ?
-                AND user_id = ?
-                AND is_deleted = 0`;
-		let [[sales]] = await pool.query(query, [startDate, endDate, user_id]);
-
-		query = `SELECT
-                COALESCE(SUM(total_amount), 0) AS totalReturn,
-                COALESCE(SUM(total_cost), 0) AS totalReturnCost,
-                COALESCE(SUM(total_amount - total_cost), 0) AS grossReturn
-            FROM
-                return_orders
-            WHERE
-                DATE(order_datetime) >= ?
-                AND DATE(order_datetime) <= ?
-                AND user_id = ?
-                AND is_deleted = 0`;
-		let [[returns]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-		]);
-
-		query = `SELECT
-                COALESCE(SUM(total_value), 0) AS totalPayment
-            FROM
-                journal_vouchers
-            WHERE
-                DATE(journal_date) >= ?
-                AND DATE(journal_date) <= ?
-                AND user_id = ?
-                AND journal_description = 'Payment Received'
-                AND is_deleted = 0`;
-		let [[payments]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-		]);
-
-		query = `SELECT
-                COALESCE(SUM(total_value), 0) AS totalExpense
-            FROM
-                journal_vouchers
-            WHERE
-                DATE(journal_date) >= ?
-                AND DATE(journal_date) <= ?
-                AND user_id = ?
-                AND journal_description = 'Expense'
-                AND is_deleted = 0`;
-		let [[expenses]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-		]);
-
-		query = `SELECT COALESCE(sum(total_cost),0) AS totalDispose
-                FROM dispose_products 
-                WHERE DATE(dispose_datetime) BETWEEN ? AND ?
-                AND user_id = ? AND is_deleted = 0;`;
-		let [[dispose]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-		]);
-
-		query = `SELECT
-        COALESCE(SUM(total_value), 0) AS totalMoneyTransfer
-        FROM
-            journal_vouchers
-        WHERE
-            DATE(journal_date) >= ?
-            AND DATE(journal_date) <= ?
-            AND user_id = ?
-            AND journal_description = 'Transfer'
-            AND is_deleted = 0`;
-		let [[moneyTransfer]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-		]);
-
-		return { sales, returns, payments, expenses, dispose, moneyTransfer };
-	}
-
-	static async getTotalPayments(user_id, startDate, endDate) {
-		let query = `
-        SELECT
-        COALESCE(sum(total_value), 0) as totalPayment
-        FROM journal_vouchers P
-        WHERE P.is_deleted = 0 
-        AND DATE(P.journal_date) BETWEEN ? AND ?
-        AND P.user_id = ?
-        AND journal_description = 'Payment Received';`;
-		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
-		return result;
-	}
-
-	// get stock value
-	static async getStockValue(user_id) {
-		const query = `SELECT
+    // get stock value
+    static async getStockValue(database_id) {
+        const query = `SELECT
             SUM(T.quantity * P.unit_cost_usd) AS cost_value_usd,
             SUM(T.quantity * I.unit_price_usd) AS selling_value_usd,
             SUM(T.quantity) AS total_quantity_usd
@@ -126,23 +21,23 @@ class ReportModel {
 				END
 			) AS quantity
             FROM inventory_transactions
-			WHERE user_id_fk = ?
+			WHERE database_id = ?
             GROUP BY product_id_fk
         ) T ON P.product_id = T.product_id_fk
 		LEFT JOIN inventory I ON I.product_id_fk = P.product_id
         WHERE P.is_deleted = 0
-		AND I.user_id_fk = ?
+		AND I.database_id = ?
         AND T.quantity > 0`;
-		let [[result]] = await pool.query(query, [user_id, user_id]);
+        let [[result]] = await pool.query(query, [database_id, database_id]);
 
-		return result;
-	}
+        return result;
+    }
 
-	// ***************************** New Reports *****************************
+    // ***************************** New Reports *****************************
 
-	// get revenue
-	static async getRevenue(startDate, endDate, user_id) {
-		let query = `SELECT
+    // get revenue
+    static async getRevenue(startDate, endDate, database_id) {
+        let query = `SELECT
             COALESCE(SUM(soi.quantity * soi.unit_price), 0) AS totalSale,
             COALESCE(SUM(soi.quantity * CASE WHEN soi.avg_cost = 0 OR soi.avg_cost IS NULL THEN soi.unit_cost ELSE soi.avg_cost END), 0) AS totalCost,
             COALESCE(SUM(soi.quantity * (soi.unit_price - CASE WHEN soi.avg_cost = 0 OR soi.avg_cost IS NULL THEN soi.unit_cost ELSE soi.avg_cost END)), 0) AS grossProfit
@@ -152,16 +47,20 @@ class ReportModel {
             sales_orders so ON soi.order_id = so.order_id
             WHERE
             so.order_datetime BETWEEN ? AND ?
-            AND so.user_id = ?
+            AND so.database_id = ?
             AND soi.is_deleted = 0`;
-		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
+        let [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+        ]);
 
-		return result;
-	}
+        return result;
+    }
 
-	// get returns
-	static async getReturns(startDate, endDate, user_id) {
-		const query = `SELECT
+    // get returns
+    static async getReturns(startDate, endDate, database_id) {
+        const query = `SELECT
             COALESCE(SUM(roi.quantity * roi.unit_price), 0) AS totalReturn,
             COALESCE(SUM(roi.quantity * CASE WHEN roi.avg_cost = 0 OR roi.avg_cost IS NULL THEN roi.unit_cost ELSE roi.avg_cost END), 0) AS totalCost,
             COALESCE(SUM(roi.quantity * (roi.unit_price - CASE WHEN roi.avg_cost = 0 OR roi.avg_cost IS NULL THEN roi.unit_cost ELSE roi.avg_cost END)), 0) AS grossReturn
@@ -171,42 +70,46 @@ class ReportModel {
             return_orders ro ON roi.order_id = ro.order_id
             WHERE
             ro.order_datetime BETWEEN ? AND ?
-            AND ro.user_id = ?
+            AND ro.database_id = ?
             AND roi.is_deleted = 0`;
 
-		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
+        let [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+        ]);
 
-		return result;
-	}
+        return result;
+    }
 
-	// get total orders and returns
-	static async getTotalOrders(startDate, endDate, user_id) {
-		const query = `SELECT
-    (SELECT COUNT(*) FROM sales_orders WHERE order_datetime BETWEEN ? AND ? AND user_id = ? AND is_deleted = 0) AS total_orders,
+    // get total orders and returns
+    static async getTotalOrders(startDate, endDate, database_id) {
+        const query = `SELECT
+    (SELECT COUNT(*) FROM sales_orders WHERE order_datetime BETWEEN ? AND ? AND database_id = ? AND is_deleted = 0) AS total_orders,
 
 	(SELECT COALESCE(SUM(quantity), 0) FROM sales_order_items soi
         INNER JOIN sales_orders so ON so.order_id = soi.order_id
-        WHERE so.order_datetime BETWEEN ? AND ? AND user_id = ? AND soi.is_deleted = 0) AS total_items,
+        WHERE so.order_datetime BETWEEN ? AND ? AND database_id = ? AND soi.is_deleted = 0) AS total_items,
 
-    (SELECT COUNT(*) FROM return_orders WHERE order_datetime BETWEEN ? AND ? AND user_id = ? AND is_deleted = 0) AS total_returns;`;
+    (SELECT COUNT(*) FROM return_orders WHERE order_datetime BETWEEN ? AND ? AND database_id = ? AND is_deleted = 0) AS total_returns;`;
 
-		const [[result]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-			startDate,
-			endDate,
-			user_id,
-			startDate,
-			endDate,
-			user_id,
-		]);
+        const [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+            startDate,
+            endDate,
+            database_id,
+            startDate,
+            endDate,
+            database_id,
+        ]);
 
-		return result;
-	}
+        return result;
+    }
 
-	static async getDebts(startDate, endDate, user_id) {
-		const query = `
+    static async getDebts(startDate, endDate, database_id) {
+        const query = `
             SELECT
                 COALESCE(SUM(total_debts), 0) AS total_debts
             FROM (
@@ -224,47 +127,55 @@ class ReportModel {
                     AND a.is_customer = 1
 					AND a.is_deleted = 0
                     AND DATE(jv.journal_date) BETWEEN ? AND ?
-                    AND jv.user_id = ?
+                    AND jv.database_id = ?
                 GROUP BY
                     ji.partner_id_fk
             ) AS customer_balances;`;
-		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
+        let [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+        ]);
 
-		return result;
-	}
+        return result;
+    }
 
-	// get customer payments
-	static async getCustomerPayments(startDate, endDate, user_id) {
-		const query = `SELECT SUM(total_value) AS total_payments
+    // get customer payments
+    static async getCustomerPayments(startDate, endDate, database_id) {
+        const query = `SELECT SUM(total_value) AS total_payments
             FROM journal_vouchers
             WHERE journal_date BETWEEN ? AND ?
-            AND user_id = ?
+            AND database_id = ?
             AND journal_description = 'Payment Received'`;
-		let [[result]] = await pool.query(query, [startDate, endDate, user_id]);
-		return result;
-	}
+        let [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+        ]);
+        return result;
+    }
 
-	static async getCashBalance(startDate, endDate, user_id) {
-		const [cashAccount] = await Accounts.getIdByAccountNumber("531");
-		const query = `SELECT
+    static async getCashBalance(startDate, endDate, database_id) {
+        const [cashAccount] = await Accounts.getIdByAccountNumber("531");
+        const query = `SELECT
         COALESCE(sum(debit) - sum(credit),0) AS balance
         FROM journal_items ji
         where ji.is_deleted = 0
         AND ji.journal_date BETWEEN ? AND ?
-        AND ji.user_id = ?
+        AND ji.database_id = ?
         AND ji.account_id_fk = ?`;
-		let [[result]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-			cashAccount.id,
-		]);
-		return result;
-	}
+        let [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+            cashAccount.id,
+        ]);
+        return result;
+    }
 
-	static async getManualCashTransactions(startDate, endDate, user_id) {
-		const [cashAccount] = await Accounts.getIdByAccountNumber("531");
-		const query = `SELECT
+    static async getManualCashTransactions(startDate, endDate, database_id) {
+        const [cashAccount] = await Accounts.getIdByAccountNumber("531");
+        const query = `SELECT
         sum(debit) as total_debit,
         sum(credit) as total_credit,
         COALESCE(sum(debit) - sum(credit),0) AS balance
@@ -272,42 +183,42 @@ class ReportModel {
         WHERE ji.is_deleted = 0
         AND ji.reference_number = 'manual'
 		AND ji.journal_date BETWEEN ? AND ?
-        AND ji.user_id = ?
+        AND ji.database_id = ?
         AND ji.account_id_fk = ?`;
-		let [[result]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-			cashAccount.id,
-		]);
-		return result;
-	}
+        let [[result]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+            cashAccount.id,
+        ]);
+        return result;
+    }
 
-	// get total expenses
-	static async getExpenses(startDate, endDate, user_id) {
-		const query = `SELECT
+    // get total expenses
+    static async getExpenses(startDate, endDate, database_id) {
+        const query = `SELECT
 		SUM(total_value) AS totalExpenses
 		FROM journal_vouchers
-		WHERE user_id = ?
+		WHERE database_id = ?
 		AND DATE(journal_date) BETWEEN ? AND ?
 		AND is_deleted = 0 AND journal_number LIKE 'EXP%'`;
 
-		let [[results]] = await pool.query(query, [
-			user_id,
-			startDate,
-			endDate,
-		]);
+        let [[results]] = await pool.query(query, [
+            database_id,
+            startDate,
+            endDate,
+        ]);
 
-		return results;
-	}
+        return results;
+    }
 
-	// get total supplier payments
-	static async getSupplierPayments(startDate, endDate, user_id) {
-		let query = `SELECT
+    // get total supplier payments
+    static async getSupplierPayments(startDate, endDate, database_id) {
+        let query = `SELECT
         SUM(total_value) AS totalSupplierPayments
         FROM journal_vouchers
         WHERE DATE(journal_date) BETWEEN ? AND ?
-        AND user_id = ?
+        AND database_id = ?
         AND journal_number LIKE 'REC%'
 		AND is_deleted = 0
         UNION
@@ -316,24 +227,24 @@ class ReportModel {
         JOIN journal_vouchers jv ON ji.journal_id_fk = jv.journal_id
         WHERE account_id_fk = 7
         AND DATE(ji.journal_date) BETWEEN ? AND ?
-        AND ji.user_id = ?
+        AND ji.database_id = ?
         AND journal_description = 'Supplier Payment';`;
 
-		let [results] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-			startDate,
-			endDate,
-			user_id,
-		]);
+        let [results] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+            startDate,
+            endDate,
+            database_id,
+        ]);
 
-		return results;
-	}
+        return results;
+    }
 
-	// get top sales
-	static async getTopSales(startDate, endDate, id, user_id) {
-		let query = `SELECT p.*, c.category_name,
+    // get top sales
+    static async getTopSales(startDate, endDate, id, database_id) {
+        let query = `SELECT p.*, c.category_name,
                 SUM(soi.quantity) AS count FROM sales_order_items soi
                 INNER JOIN products p  ON soi.product_id  = p.product_id
 				LEFT JOIN products_categories c ON p.category_id_fk = c.category_id
@@ -342,25 +253,25 @@ class ReportModel {
                 (SELECT so.order_id FROM sales_orders so
                     WHERE DATE(so.order_datetime) >= ?
                     AND DATE(so.order_datetime) <= ?
-					AND so.user_id = ?
+					AND so.database_id = ?
                     AND so.is_deleted = 0)`;
 
-		if (id != "null") {
-			query += ` AND p.product_id = ? `;
-		}
-		query += `GROUP BY p.product_id
+        if (id != "null") {
+            query += ` AND p.product_id = ? `;
+        }
+        query += `GROUP BY p.product_id
                 ORDER BY count DESC;`;
-		let [results] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-			id,
-		]);
-		return results;
-	}
+        let [results] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+            id,
+        ]);
+        return results;
+    }
 
-	static async getTopCategories(startDate, endDate, user_id) {
-		let query = `SELECT PC.category_name,
+    static async getTopCategories(startDate, endDate, database_id) {
+        let query = `SELECT PC.category_name,
         SUM(SOI.quantity) AS count FROM sales_orders SO
         INNER JOIN sales_order_items SOI ON SO.order_id = SOI.order_id
 
@@ -369,30 +280,34 @@ class ReportModel {
         WHERE SO.is_deleted = 0
         AND DATE(SO.order_datetime) >= ?
         AND DATE (SO.order_datetime) <= ?
-		AND SO.user_id = ?
+		AND SO.database_id = ?
         GROUP BY PC.category_name
         ORDER BY count DESC
         LIMIT 10
     `;
-		let [results] = await pool.query(query, [startDate, endDate, user_id]);
-		return results;
-	}
+        let [results] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+        ]);
+        return results;
+    }
 
-	static async getDisposes(startDate, endDate, user_id) {
-		const query = `SELECT SUM(total_cost) total_disposes
+    static async getDisposes(startDate, endDate, database_id) {
+        const query = `SELECT SUM(total_cost) total_disposes
 		FROM dispose_products
 		WHERE dispose_datetime BETWEEN ? AND ? 
-		AND user_id = ?
+		AND database_id = ?
 		AND is_deleted = 0`;
 
-		let [[results]] = await pool.query(query, [
-			startDate,
-			endDate,
-			user_id,
-		]);
+        let [[results]] = await pool.query(query, [
+            startDate,
+            endDate,
+            database_id,
+        ]);
 
-		return results;
-	}
+        return results;
+    }
 }
 
 module.exports = ReportModel;
