@@ -84,7 +84,7 @@ app.use(errorHandler);
 
 const initBackupCron = require("./backup"); // Import cron module
 
-// initBackupCron(); // Initialize the backup cron job
+initBackupCron(); // Initialize the backup cron job
 
 // start server
 server.listen(process.env.PORT, () =>
