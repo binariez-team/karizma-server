@@ -46,7 +46,7 @@ class ReportModel {
             JOIN
             sales_orders so ON soi.order_id = so.order_id
             WHERE
-            so.order_datetime BETWEEN ? AND ?
+            DATE(so.order_datetime) BETWEEN ? AND ?
             AND so.database_id = ?
             AND soi.is_deleted = 0`;
         let [[result]] = await pool.query(query, [
@@ -69,7 +69,7 @@ class ReportModel {
             JOIN
             return_orders ro ON roi.order_id = ro.order_id
             WHERE
-            ro.order_datetime BETWEEN ? AND ?
+            DATE(ro.order_datetime) BETWEEN ? AND ?
             AND ro.database_id = ?
             AND roi.is_deleted = 0`;
 
@@ -89,9 +89,9 @@ class ReportModel {
 
 	(SELECT COALESCE(SUM(quantity), 0) FROM sales_order_items soi
         INNER JOIN sales_orders so ON so.order_id = soi.order_id
-        WHERE so.order_datetime BETWEEN ? AND ? AND database_id = ? AND soi.is_deleted = 0) AS total_items,
+        WHERE DATE(so.order_datetime) BETWEEN ? AND ? AND database_id = ? AND soi.is_deleted = 0) AS total_items,
 
-    (SELECT COUNT(*) FROM return_orders WHERE order_datetime BETWEEN ? AND ? AND database_id = ? AND is_deleted = 0) AS total_returns;`;
+    (SELECT COUNT(*) FROM return_orders WHERE DATE(order_datetime) BETWEEN ? AND ? AND database_id = ? AND is_deleted = 0) AS total_returns;`;
 
         const [[result]] = await pool.query(query, [
             startDate,
@@ -144,7 +144,7 @@ class ReportModel {
     static async getCustomerPayments(startDate, endDate, database_id) {
         const query = `SELECT SUM(total_value) AS total_payments
             FROM journal_vouchers
-            WHERE journal_date BETWEEN ? AND ?
+            WHERE DATE(journal_date) BETWEEN ? AND ?
             AND database_id = ?
             AND journal_description = 'Payment Received'`;
         let [[result]] = await pool.query(query, [
@@ -161,7 +161,7 @@ class ReportModel {
         COALESCE(sum(debit) - sum(credit),0) AS balance
         FROM journal_items ji
         where ji.is_deleted = 0
-        AND ji.journal_date BETWEEN ? AND ?
+        AND DATE(ji.journal_date) BETWEEN ? AND ?
         AND ji.database_id = ?
         AND ji.account_id_fk = ?`;
         let [[result]] = await pool.query(query, [
@@ -182,7 +182,7 @@ class ReportModel {
         FROM journal_items ji
         WHERE ji.is_deleted = 0
         AND ji.reference_number = 'manual'
-		AND ji.journal_date BETWEEN ? AND ?
+		AND DATE(ji.journal_date) BETWEEN ? AND ?
         AND ji.database_id = ?
         AND ji.account_id_fk = ?`;
         let [[result]] = await pool.query(query, [
