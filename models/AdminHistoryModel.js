@@ -5,14 +5,14 @@ class AdminHistory {
     // fetch deliver invoices for admin
     static async fetchDeliverHistory(criteria) {
         let sql = `SELECT
-                U.first_name AS first_name,
                 O.*,
+                U.database_name AS first_name,
                 DATE(O.order_datetime) AS order_date,
                 JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
             	FROM deliver_orders O
             	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
 				INNER JOIN products S ON S.product_id = M.product_id
-				INNER JOIN users U ON O.database_id = U.database_id
+				INNER JOIN user_database U ON O.database_id = U.database_id
 				WHERE O.is_deleted = 0 `;
         const params = [];
         if (criteria.invoice_number) {
