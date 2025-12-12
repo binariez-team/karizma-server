@@ -35,11 +35,13 @@ exports.approvePendingInvoice = async (req, res, next) => {
             database_id,
             admin_id
         );
-        const [user] = await User.getById(database_id);
+        const [database] = await User.getDatabaseById(database_id);
+
+        console.log(database);
 
         // this is to inform admin that user approved invoice
         io.emit("deliverCompleted", {
-            user: user.first_name,
+            user: database.database_name,
             id: id,
         });
         res.status(200).send(invoices);

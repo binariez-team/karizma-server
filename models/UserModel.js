@@ -13,7 +13,7 @@ class User {
     // get all exept user id for users
     static async getAllByUser(id) {
         const [rows] = await pool.query(
-            `SELECT ud.database_id, ud.database_name FROM user_database ud INNER JOIN users u ON ud.database_id = u.database_id WHERE u.user_type = 'user' AND u.is_deleted = 0 AND u.user_id != ?`,
+            `SELECT ud.database_id, ud.database_name FROM user_database ud INNER JOIN users u ON ud.database_id = u.database_id WHERE u.user_type = 'user' AND u.is_deleted = 0 AND u.database_id != ?`,
             [id]
         );
         return rows;
@@ -32,6 +32,15 @@ class User {
     static async getById(id) {
         const [rows] = await pool.query(
             `SELECT user_id, username, first_name, last_name, user_type, last_login FROM users WHERE user_id = ?`,
+            id
+        );
+        return rows;
+    }
+
+    // get database by id
+    static async getDatabaseById(id) {
+        const [rows] = await pool.query(
+            `SELECT database_id, database_name FROM user_database WHERE database_id = ?`,
             id
         );
         return rows;
