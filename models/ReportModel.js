@@ -296,7 +296,7 @@ class ReportModel {
     static async getDisposes(startDate, endDate, database_id) {
         const query = `SELECT SUM(total_cost) total_disposes
 		FROM dispose_products
-		WHERE dispose_datetime BETWEEN ? AND ? 
+		WHERE DATE(dispose_datetime) BETWEEN ? AND ? 
 		AND database_id = ?
 		AND is_deleted = 0`;
 
