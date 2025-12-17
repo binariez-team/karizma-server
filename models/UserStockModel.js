@@ -35,6 +35,7 @@ class UserProduct {
 						SUM(CASE WHEN transaction_type = 'REVERSEDELIVER' THEN quantity ELSE 0 END) AS quantity
 					FROM inventory_transactions
 					WHERE database_id = ?
+                    AND is_deleted = 0
 					GROUP BY product_id_fk
 				) t ON P.product_id = t.product_id_fk
 				WHERE P.is_deleted = 0
@@ -77,6 +78,7 @@ class UserProduct {
 						SUM(CASE WHEN transaction_type = 'REVERSEDELIVER' THEN quantity ELSE 0 END) AS quantity
 					FROM inventory_transactions
 					WHERE database_id = ?
+                    AND is_deleted = 0
 					GROUP BY product_id_fk
 				) t ON P.product_id = t.product_id_fk
 				WHERE P.product_id = ?`;
