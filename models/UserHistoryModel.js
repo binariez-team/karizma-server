@@ -59,6 +59,18 @@ class UserHistory {
         try {
             await connection.beginTransaction();
 
+            // check if the deliver order id has already been approved
+            let [[check]] = await connection.query(
+                `SELECT is_approved FROM deliver_orders WHERE order_id = ?`,
+                [id]
+            );
+
+            if (check && check.is_approved == 1) {
+                await connection.rollback();
+                return { status: "error", message: "Already approved!" };
+                // throw new Error("Already approved!");
+            }
+
             await connection.query(
                 `UPDATE deliver_orders SET is_approved = 1 WHERE order_id = ?`,
                 id
@@ -113,6 +125,11 @@ class UserHistory {
 
             // after successfull
             await connection.commit();
+
+            return {
+                status: "success",
+                message: "Invoice approved successfully!",
+            };
         } catch (error) {
             await connection.rollback();
             throw error;

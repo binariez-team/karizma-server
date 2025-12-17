@@ -30,21 +30,26 @@ exports.approvePendingInvoice = async (req, res, next) => {
         const io = req.io;
         const { id, database_id, admin_id } = req.body;
 
-        let invoices = await UserHistory.approvePendingInvoice(
+        let result = await UserHistory.approvePendingInvoice(
             id,
             database_id,
             admin_id
         );
-        const [database] = await User.getDatabaseById(database_id);
 
-        console.log(database);
+        if (result.status) {
+            if (result.status === "error") {
+                return res.status(400).send(result);
+            }
+        }
+
+        const [database] = await User.getDatabaseById(database_id);
 
         // this is to inform admin that user approved invoice
         io.emit("deliverCompleted", {
             user: database.database_name,
             id: id,
         });
-        res.status(200).send(invoices);
+        res.status(200).send(result);
     } catch (error) {
         next(error);
     }
