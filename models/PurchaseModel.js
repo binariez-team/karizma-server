@@ -131,7 +131,7 @@ class PurchaseOrders {
                 // let priceToAdd = record.selling_price; // updated selling price
 
                 await connection.query(
-                    `UPDATE products SET unit_cost_usd = ?, avg_cost_usd = ((? * ?) + (? * ?)) / (? + ?) WHERE product_id = ?`,
+                    `UPDATE products SET  unit_cost_usd = ?, avg_cost_usd = ((? * ?) + (? * ?)) / (? + ?) WHERE product_id = ?`,
                     [
                         record.unit_price,
                         quantity,
@@ -141,6 +141,17 @@ class PurchaseOrders {
                         quantity,
                         record.quantity,
                         record.product_id,
+                    ]
+                );
+
+                await connection.query(
+                    `UPDATE inventory SET grandwhole_price_usd = ?, whole_price_usd = ?, unit_price_usd = ? WHERE product_id_fk = ? AND database_id = ?`,
+                    [
+                        record.grandwhole_price_usd,
+                        record.whole_price_usd,
+                        record.unit_price_usd,
+                        record.product_id,
+                        database_id,
                     ]
                 );
 
