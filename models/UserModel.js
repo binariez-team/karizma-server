@@ -135,8 +135,6 @@ class User {
             user.user_id,
         ]);
 
-        console.log(user);
-
         await pool.query(
             `UPDATE user_database SET database_name = ? WHERE database_id = ?`,
             [user.username, user.database_id]

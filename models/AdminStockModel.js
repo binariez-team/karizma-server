@@ -11,10 +11,10 @@ class Product {
 					P.product_id,
 					P.product_name,
 					P.sku,
-					P.unit_cost_usd,
-					P.avg_cost_usd,
 					P.category_id_fk,
 					P.brand_id_fk,
+                    I.unit_cost_usd,
+                    I.avg_cost_usd,
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
@@ -56,10 +56,11 @@ class Product {
 					P.product_id,
 					P.product_name,
 					P.sku,
-					P.unit_cost_usd,
-					P.avg_cost_usd,
+					
 					P.category_id_fk,
 					P.brand_id_fk,
+                    I.unit_cost_usd,
+                    I.avg_cost_usd,
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
@@ -108,8 +109,8 @@ class Product {
                 sku: data.sku,
                 brand_id_fk: data.brand_id_fk,
                 product_name: data.product_name,
-                unit_cost_usd: data.unit_cost_usd,
-                avg_cost_usd: data.unit_cost_usd,
+                // unit_cost_usd: data.unit_cost_usd,
+                // avg_cost_usd: data.unit_cost_usd,
                 product_notes: data.product_notes,
             };
             // // insert into product table
@@ -128,6 +129,8 @@ class Product {
             let inventory = {
                 product_id_fk: rows.insertId,
                 database_id: user.database_id,
+                unit_cost_usd: data.unit_cost_usd,
+                avg_cost_usd: data.unit_cost_usd,
                 grandwhole_price_usd: data.grandwhole_price_usd,
                 whole_price_usd: data.whole_price_usd,
                 unit_price_usd: data.unit_price_usd,
@@ -158,13 +161,9 @@ class Product {
                 sku: data.sku,
                 brand_id_fk: data.brand_id_fk,
                 product_name: data.product_name,
-                unit_cost_usd: data.unit_cost_usd,
+                // unit_cost_usd: data.unit_cost_usd,
                 product_notes: data.product_notes,
             };
-
-            if (data.change_avg_cost) {
-                product.avg_cost_usd = data.unit_cost_usd;
-            }
 
             // update product table
             await connection.query(
@@ -174,10 +173,16 @@ class Product {
 
             // update inventory
             let inventory = {
+                unit_cost_usd: data.unit_cost_usd,
                 grandwhole_price_usd: data.grandwhole_price_usd,
                 whole_price_usd: data.whole_price_usd,
                 unit_price_usd: data.unit_price_usd,
             };
+
+            if (data.change_avg_cost) {
+                inventory.avg_cost_usd = data.unit_cost_usd;
+            }
+
             await connection.query(
                 `UPDATE inventory SET ? WHERE product_id_fk = ? AND database_id = ?`,
                 [inventory, data.product_id, user.database_id]

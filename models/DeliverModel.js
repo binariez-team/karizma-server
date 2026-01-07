@@ -51,9 +51,11 @@ class DeliverInvoice {
 
                 // add admin record to inventory transactions
                 await connection.query(
-                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type) VALUES (${
+                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (${
                         record.product_id
-                    }, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER');`
+                    }, ${
+                        order.admin_id_fk
+                    }, ${-record.quantity}, 'DELIVER', ${invoice_number}, ${order_id});`
                 );
             }
 
@@ -97,10 +99,9 @@ class DeliverInvoice {
                 ]
             );
 
-            //return items to inventory
             await connection.query(
-                `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type) SELECT product_id, ${user.database_id}, quantity, 'REVERSEDELIVER' FROM deliver_order_items WHERE order_id_fk = ?`,
-                [order.order_id]
+                `DELETE FROM inventory_transactions WHERE transaction_type = 'DELIVER' AND order_id_fk = ? AND database_id = ?`,
+                [order.order_id, user.database_id]
             );
 
             //delete invoice items
@@ -127,9 +128,11 @@ class DeliverInvoice {
 
                 // add admin record to inventory transactions
                 await connection.query(
-                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type) VALUES (${
+                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (${
                         record.product_id
-                    }, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER');`
+                    }, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER', '${
+                        order.invoice_number
+                    }', ${order.order_id});`
                 );
             }
 
@@ -143,21 +146,20 @@ class DeliverInvoice {
         }
     }
 
-    static async delete(order_id, admin_id) {
+    static async delete(order_id, database_id) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
 
             let [[checkPending]] = await connection.query(
                 `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0 AND admin_id_fk = ?`,
-                [order_id, admin_id]
+                [order_id, database_id]
             );
             if (!checkPending) throw new Error("approved");
 
-            //return items to inventory
             await connection.query(
-                `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type) SELECT product_id, ${admin_id}, quantity, 'REVERSEDELIVER' FROM deliver_order_items WHERE order_id_fk = ?`,
-                [order_id]
+                `DELETE FROM inventory_transactions WHERE transaction_type = 'DELIVER' AND order_id_fk = ? AND database_id = ?`,
+                [order_id, database_id]
             );
 
             //delete invoice items

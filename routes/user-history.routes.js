@@ -8,8 +8,13 @@ router.post("/deliver/search", UserHistoryController.fetchDeliverHistory);
 router.put("/deliver/approve", UserHistoryController.approvePendingInvoice);
 
 router.post(
-	"/money-transfer/search",
-	UserHistoryController.fetchUserMoneyTransferHistory
+    "/received-deliveries/search",
+    UserHistoryController.fetchReceivedDeliveries
+);
+
+router.post(
+    "/money-transfer/search",
+    UserHistoryController.fetchUserMoneyTransferHistory
 );
 
 module.exports = router;

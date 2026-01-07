@@ -4,60 +4,67 @@ const moment = require("moment-timezone");
 class History {
     // get product history
     static async getProductHistoryById(product_id, database_id) {
-        // const query = `SELECT
-        // 	T.*,
-        // 	SUM(T.quantity) OVER (
-        // 		PARTITION BY T.product_id_fk
-        // 		ORDER BY T.transaction_datetime
-        // 		ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-        // 	) AS balance
-        // 	FROM inventory_transactions T
-        // 	WHERE T.product_id_fk = ?
-        // 	AND database_id = ?
-        // 	AND T.is_deleted = 0
-        // 	ORDER BY T.transaction_datetime DESC
-        // 	LIMIT 100000;`;
-
-        const query = `SELECT
-			final.*,
-			A.name AS account_name
-		FROM (
-			SELECT
-				sub.*,
-				COALESCE(SO.customer_id, RO.customer_id, PO.partner_id_fk) AS account_id,
-				CASE
-					WHEN sub.transaction_type = 'SALE' THEN 'sales_orders'
-					WHEN sub.transaction_type = 'RETURN' THEN 'return_orders'
-					WHEN sub.transaction_type = 'SUPPLY' THEN 'purchase_orders'
-					ELSE NULL
-				END AS order_table
-			FROM (
-				SELECT
-					T.*,
-					SUM(T.quantity) OVER (
-						PARTITION BY T.product_id_fk
-						ORDER BY T.transaction_datetime
-						ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
-					) AS balance
-				FROM inventory_transactions T
-				WHERE T.product_id_fk = ?
+        const query = `
+        SELECT
+            final.*,
+            A.name AS account_name,
+            CASE
+                WHEN final.transaction_type = 'DELIVER'
+                    THEN UDF.database_name
+                ELSE NULL
+            END AS 'from',
+            CASE
+                WHEN final.transaction_type = 'DELIVER'
+                    THEN UDT.database_name
+                ELSE NULL
+            END AS 'to'
+        FROM (
+            SELECT
+                sub.*,
+                COALESCE(SO.customer_id, RO.customer_id, PO.partner_id_fk) AS account_id,
+                CASE
+                    WHEN sub.transaction_type = 'SALE' THEN 'sales_orders'
+                    WHEN sub.transaction_type = 'RETURN' THEN 'return_orders'
+                    WHEN sub.transaction_type = 'SUPPLY' THEN 'purchase_orders'
+                    ELSE NULL
+                END AS order_table,
+                DO.admin_id_fk   AS from_database_id,
+                DO.database_id   AS to_database_id
+            FROM (
+                SELECT
+                    T.*,
+                    SUM(T.quantity) OVER (
+                        PARTITION BY T.product_id_fk
+                        ORDER BY T.transaction_datetime
+                        ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW
+                    ) AS balance
+                FROM inventory_transactions T
+                WHERE T.product_id_fk = ?
                 AND T.database_id = ?
-				AND T.is_deleted = 0
-			) AS sub
-			LEFT JOIN sales_orders SO 
-				ON sub.transaction_type = 'SALE' 
-			AND sub.order_id_fk = SO.order_id
-			LEFT JOIN return_orders RO 
-				ON sub.transaction_type = 'RETURN' 
-			AND sub.order_id_fk = RO.order_id
-			LEFT JOIN purchase_orders PO 
-				ON sub.transaction_type = 'SUPPLY' 
-			AND sub.order_id_fk = PO.order_id
-		) AS final
-		LEFT JOIN accounts A 
-			ON final.account_id = A.account_id
-		ORDER BY final.transaction_datetime DESC
-		LIMIT 10000;`;
+                AND T.is_deleted = 0
+            ) AS sub
+            LEFT JOIN sales_orders SO
+                ON sub.transaction_type = 'SALE'
+            AND sub.order_id_fk = SO.order_id
+            LEFT JOIN return_orders RO
+                ON sub.transaction_type = 'RETURN'
+            AND sub.order_id_fk = RO.order_id
+            LEFT JOIN purchase_orders PO
+                ON sub.transaction_type = 'SUPPLY'
+            AND sub.order_id_fk = PO.order_id
+            LEFT JOIN deliver_orders DO
+                ON sub.transaction_type = 'DELIVER'
+            AND sub.order_id_fk = DO.order_id
+        ) AS final
+        LEFT JOIN accounts A
+            ON final.account_id = A.account_id
+        LEFT JOIN user_database UDF
+            ON final.from_database_id = UDF.database_id
+        LEFT JOIN user_database UDT
+            ON final.to_database_id = UDT.database_id
+        ORDER BY final.transaction_datetime DESC
+        LIMIT 10000;
+        `;
         let [rows] = await pool.query(query, [product_id, database_id]);
         return rows;
     }

@@ -15,6 +15,20 @@ exports.fetchDeliverHistory = async (req, res, next) => {
     }
 };
 
+exports.fetchReceivedDeliveries = async (req, res, next) => {
+    try {
+        const { database_id } = req.user;
+        let criteria = req.body;
+        let invoices = await UserHistory.fetchReceivedDeliveries(
+            database_id,
+            criteria
+        );
+        res.status(200).send(invoices);
+    } catch (error) {
+        next(error);
+    }
+};
+
 exports.fetchPendingInvoices = async (req, res, next) => {
     try {
         const { database_id } = req.user;

@@ -3,7 +3,7 @@ const moment = require("moment-timezone");
 
 class AdminHistory {
     // fetch deliver invoices for admin
-    static async fetchDeliverHistory(criteria) {
+    static async fetchDeliverHistory(criteria, database_id) {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
@@ -13,8 +13,8 @@ class AdminHistory {
             	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
 				INNER JOIN products S ON S.product_id = M.product_id
 				INNER JOIN user_database U ON O.database_id = U.database_id
-				WHERE O.is_deleted = 0 `;
-        const params = [];
+				WHERE O.is_deleted = 0 AND O.admin_id_fk = ?`;
+        const params = [database_id];
         if (criteria.invoice_number) {
             sql += ` AND O.invoice_number = ?`;
             params.push(criteria.invoice_number);

@@ -50,7 +50,7 @@ exports.updateDeliverInvoice = async (req, res, next) => {
 exports.deleteDeliverInvoice = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const database_id = req.user.database_id;
+        const { database_id } = req.user;
         await DeliverInvoice.delete(id, database_id);
         res.status(200).send({
             message: "Order deleted successfully!",

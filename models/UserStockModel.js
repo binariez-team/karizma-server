@@ -9,8 +9,8 @@ class UserProduct {
 					P.product_id,
 					P.product_name,
 					P.sku,
-					P.unit_cost_usd,
-					P.avg_cost_usd,
+                    I.unit_cost_usd,
+                    I.avg_cost_usd,
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
@@ -52,8 +52,8 @@ class UserProduct {
 					P.product_id,
 					P.product_name,
 					P.sku,
-					P.unit_cost_usd,
-					P.avg_cost_usd,
+					I.unit_cost_usd,
+                    I.avg_cost_usd,
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
@@ -90,6 +90,8 @@ class UserProduct {
         ]);
         return result;
     }
+
+    // update
     static async update(database_id, product_id, prices) {
         const query = `UPDATE inventory
             SET grandwhole_price_usd = ?,
@@ -106,6 +108,7 @@ class UserProduct {
         ]);
     }
 
+    // dispose
     static async dispose(database_id, info, products) {
         const connection = await pool.getConnection();
         moment.tz.setDefault("Asia/Beirut");
@@ -255,11 +258,6 @@ class UserProduct {
             query = `UPDATE dispose_products SET is_deleted = 1 WHERE dispose_id = ?;`;
             await connection.query(query, [dispose_id]);
 
-            //inventory_transactions
-            // await connection.query(
-            // 	`INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSEDISPOSE', quantity FROM dispose_products_items WHERE dispose_id = ?`,
-            // 	[database_id, dispose_id]
-            // );
             await connection.query(
                 `DELETE FROM inventory_transactions WHERE transaction_type = 'DISPOSE' AND order_id_fk = ?`,
                 [dispose_id]

@@ -3,7 +3,11 @@ const AdminHistory = require("../models/AdminHistoryModel");
 exports.fetchDeliverHistory = async (req, res, next) => {
     try {
         let criteria = req.body;
-        let invoices = await AdminHistory.fetchDeliverHistory(criteria);
+        const { database_id } = req.user;
+        let invoices = await AdminHistory.fetchDeliverHistory(
+            criteria,
+            database_id
+        );
         res.status(200).send(invoices);
     } catch (error) {
         next(error);

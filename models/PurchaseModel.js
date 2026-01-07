@@ -115,8 +115,8 @@ class PurchaseOrders {
                 // check old average cost
                 let [[{ avg_cost_usd, unit_cost_usd }]] =
                     await connection.query(
-                        `SELECT avg_cost_usd, unit_cost_usd FROM products WHERE product_id = ?`,
-                        record.product_id
+                        `SELECT avg_cost_usd, unit_cost_usd FROM inventory WHERE product_id_fk = ? AND database_id = ?`,
+                        [record.product_id, database_id]
                     );
 
                 // set avg cost equals to unit cost if it is 0 or not been calculated
@@ -131,7 +131,7 @@ class PurchaseOrders {
                 // let priceToAdd = record.selling_price; // updated selling price
 
                 await connection.query(
-                    `UPDATE products SET  unit_cost_usd = ?, avg_cost_usd = ((? * ?) + (? * ?)) / (? + ?) WHERE product_id = ?`,
+                    `UPDATE inventory SET  unit_cost_usd = ?, avg_cost_usd = ((? * ?) + (? * ?)) / (? + ?) WHERE product_id_fk = ? AND database_id = ?`,
                     [
                         record.unit_price,
                         quantity,
@@ -141,6 +141,7 @@ class PurchaseOrders {
                         quantity,
                         record.quantity,
                         record.product_id,
+                        database_id,
                     ]
                 );
 
