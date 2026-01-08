@@ -55,7 +55,7 @@ class DeliverInvoice {
                         record.product_id
                     }, ${
                         order.admin_id_fk
-                    }, ${-record.quantity}, 'DELIVER', ${invoice_number}, ${order_id});`
+                    }, ${-record.quantity}, 'DELIVER', '${invoice_number}', ${order_id});`
                 );
             }
 
