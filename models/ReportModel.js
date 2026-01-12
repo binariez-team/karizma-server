@@ -5,7 +5,7 @@ class ReportModel {
     // get stock value
     static async getStockValue(database_id) {
         const query = `SELECT
-            SUM(T.quantity * P.unit_cost_usd) AS cost_value_usd,
+            SUM(T.quantity * I.avg_cost_usd) AS cost_value_usd,
             SUM(T.quantity * I.unit_price_usd) AS selling_value_usd,
             SUM(T.quantity) AS total_quantity_usd
 
