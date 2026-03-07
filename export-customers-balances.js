@@ -64,6 +64,30 @@ function escapeCSV(val) {
     return str;
 }
 
+// 🧹 Cleanup Drive exports (keep only last 10)
+async function cleanupDriveExports() {
+    try {
+        const list = await drive.files.list({
+            q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name contains 'customers_balances_'`,
+            fields: "files(id, name, createdTime)",
+        });
+
+        const files = list.data.files || [];
+        // Sort by createdTime descending (newest first)
+        files.sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
+
+        if (files.length > 10) {
+            const filesToDelete = files.slice(10); // Keep first 10
+            for (const f of filesToDelete) {
+                await drive.files.delete({ fileId: f.id });
+                console.log(`☁️🗑 Removed old Drive export: ${f.name}`);
+            }
+        }
+    } catch (err) {
+        console.error("❌ Drive Cleanup Error:", err.message);
+    }
+}
+
 async function exportCustomersBalances() {
     const time = timestamp();
     const fileName = `customers_balances_${time}.csv`;
@@ -107,6 +131,8 @@ async function exportCustomersBalances() {
 
         await uploadToDrive(filePath, fileName);
 
+        await cleanupDriveExports();
+
         // Clean up locally after upload
         if (fs.existsSync(filePath)) {
             fs.unlinkSync(filePath);
@@ -120,9 +146,9 @@ async function exportCustomersBalances() {
 function initExportCron() {
     console.log("🔁 Initializing export customers balances cron...");
 
-    // Run once at startup (optional, but requested to test? I'll omit it so it only runs on schedule,
-    // unless you want me to run it now. User said: "Run automatically every 1 hour")
-    // Let's just create the schedule.
+    // Run once at startup
+    exportCustomersBalances();
+
     // Schedule → every 1 hour (runs at minute 0 past every hour)
     cron.schedule("0 * * * *", exportCustomersBalances, {
         timezone: "Asia/Beirut",
