@@ -83,10 +83,12 @@ app.get("/", (req, res) => {
 app.use(errorHandler);
 
 const initBackupCron = require("./backup"); // Import cron module
+const initExportCron = require("./export-customers-balances"); // Import export cron module
 
 initBackupCron(); // Initialize the backup cron job
+initExportCron(); // Initialize export cron job
 
 // start server
 server.listen(process.env.PORT, () =>
-    console.log(`listening on port ${process.env.PORT} ...`)
+    console.log(`listening on port ${process.env.PORT} ...`),
 );
