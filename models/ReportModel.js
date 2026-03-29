@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const Accounts = require("./AccountsModel");
+const moment = require("moment-timezone");
 
 class ReportModel {
     // get stock value
@@ -37,9 +38,10 @@ class ReportModel {
 
     // get revenue
     static async getRevenue(startDate, endDate, database_id) {
-        console.log(startDate);
-        console.log(endDate);
-        console.log(database_id);
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
 
         let query = `SELECT
             COALESCE(SUM(soi.quantity * soi.unit_price), 0) AS totalSale,
@@ -54,8 +56,8 @@ class ReportModel {
             AND so.database_id = ?
             AND soi.is_deleted = 0`;
         let [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
 
