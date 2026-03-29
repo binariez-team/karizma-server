@@ -37,6 +37,10 @@ class ReportModel {
 
     // get revenue
     static async getRevenue(startDate, endDate, database_id) {
+        console.log(startDate);
+        console.log(endDate);
+        console.log(database_id);
+
         let query = `SELECT
             COALESCE(SUM(soi.quantity * soi.unit_price), 0) AS totalSale,
             COALESCE(SUM(soi.quantity * CASE WHEN soi.avg_cost = 0 OR soi.avg_cost IS NULL THEN soi.unit_cost ELSE soi.avg_cost END), 0) AS totalCost,
