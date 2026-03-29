@@ -66,6 +66,11 @@ class ReportModel {
 
     // get returns
     static async getReturns(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const query = `SELECT
             COALESCE(SUM(roi.quantity * roi.unit_price), 0) AS totalReturn,
             COALESCE(SUM(roi.quantity * CASE WHEN roi.avg_cost = 0 OR roi.avg_cost IS NULL THEN roi.unit_cost ELSE roi.avg_cost END), 0) AS totalCost,
@@ -80,8 +85,8 @@ class ReportModel {
             AND roi.is_deleted = 0`;
 
         let [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
 
@@ -90,6 +95,10 @@ class ReportModel {
 
     // get total orders and returns
     static async getTotalOrders(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
         const query = `SELECT
     (SELECT COUNT(*) FROM sales_orders WHERE order_datetime BETWEEN ? AND ? AND database_id = ? AND is_deleted = 0) AS total_orders,
 
@@ -100,14 +109,14 @@ class ReportModel {
     (SELECT COUNT(*) FROM return_orders WHERE DATE(order_datetime) BETWEEN ? AND ? AND database_id = ? AND is_deleted = 0) AS total_returns;`;
 
         const [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
 
@@ -115,6 +124,11 @@ class ReportModel {
     }
 
     static async getDebts(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const query = `
             SELECT
                 COALESCE(SUM(total_debts), 0) AS total_debts
@@ -138,8 +152,8 @@ class ReportModel {
                     ji.partner_id_fk
             ) AS customer_balances;`;
         let [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
 
@@ -148,20 +162,30 @@ class ReportModel {
 
     // get customer payments
     static async getCustomerPayments(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const query = `SELECT SUM(total_value) AS total_payments
             FROM journal_vouchers
             WHERE DATE(journal_date) BETWEEN ? AND ?
             AND database_id = ?
             AND journal_description = 'Payment Received'`;
         let [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
         return result;
     }
 
     static async getCashBalance(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const [cashAccount] = await Accounts.getIdByAccountNumber("531");
         const query = `SELECT
         COALESCE(sum(debit) - sum(credit),0) AS balance
@@ -171,8 +195,8 @@ class ReportModel {
         AND ji.database_id = ?
         AND ji.account_id_fk = ?`;
         let [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
             cashAccount.id,
         ]);
@@ -180,6 +204,11 @@ class ReportModel {
     }
 
     static async getManualCashTransactions(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const [cashAccount] = await Accounts.getIdByAccountNumber("531");
         const query = `SELECT
         sum(debit) as total_debit,
@@ -192,8 +221,8 @@ class ReportModel {
         AND ji.database_id = ?
         AND ji.account_id_fk = ?`;
         let [[result]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
             cashAccount.id,
         ]);
@@ -202,6 +231,11 @@ class ReportModel {
 
     // get total expenses
     static async getExpenses(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const query = `SELECT
 		SUM(total_value) AS totalExpenses
 		FROM journal_vouchers
@@ -211,8 +245,8 @@ class ReportModel {
 
         let [[results]] = await pool.query(query, [
             database_id,
-            startDate,
-            endDate,
+            start_date,
+            end_date,
         ]);
 
         return results;
@@ -220,6 +254,11 @@ class ReportModel {
 
     // get total supplier payments
     static async getSupplierPayments(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         let query = `SELECT
         SUM(total_value) AS totalSupplierPayments
         FROM journal_vouchers
@@ -237,11 +276,11 @@ class ReportModel {
         AND journal_description = 'Supplier Payment';`;
 
         let [results] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
 
@@ -250,6 +289,11 @@ class ReportModel {
 
     // get top sales
     static async getTopSales(startDate, endDate, id, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         let query = `SELECT p.*, c.category_name,
                 SUM(soi.quantity) AS count FROM sales_order_items soi
                 INNER JOIN products p  ON soi.product_id  = p.product_id
@@ -268,8 +312,8 @@ class ReportModel {
         query += `GROUP BY p.product_id
                 ORDER BY count DESC;`;
         let [results] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
             id,
         ]);
@@ -277,6 +321,11 @@ class ReportModel {
     }
 
     static async getTopCategories(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         let query = `SELECT PC.category_name,
         SUM(SOI.quantity) AS count FROM sales_orders SO
         INNER JOIN sales_order_items SOI ON SO.order_id = SOI.order_id
@@ -292,14 +341,19 @@ class ReportModel {
         LIMIT 10
     `;
         let [results] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
         return results;
     }
 
     static async getDisposes(startDate, endDate, database_id) {
+        const start_date = moment(startDate)
+            .tz("Asia/Beirut")
+            .format("YYYY-MM-DD");
+        const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
+
         const query = `SELECT SUM(total_cost) total_disposes
 		FROM dispose_products
 		WHERE DATE(dispose_datetime) BETWEEN ? AND ? 
@@ -307,8 +361,8 @@ class ReportModel {
 		AND is_deleted = 0`;
 
         let [[results]] = await pool.query(query, [
-            startDate,
-            endDate,
+            start_date,
+            end_date,
             database_id,
         ]);
 
