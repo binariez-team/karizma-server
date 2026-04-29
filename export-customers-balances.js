@@ -64,6 +64,21 @@ function escapeCSV(val) {
     return str;
 }
 
+// 🧹 Cleanup local exports older than 1 day
+function cleanupLocalExports() {
+    const cutoff = Date.now() - 1 * 24 * 60 * 60 * 1000;
+
+    fs.readdirSync(exportsFolder).forEach(file => {
+        const filePath = path.join(exportsFolder, file);
+        const stats = fs.statSync(filePath);
+
+        if (stats.mtimeMs < cutoff) {
+            fs.unlinkSync(filePath);
+            console.log(`🗑 Removed old local export: ${file}`);
+        }
+    });
+}
+
 // 🧹 Cleanup Drive exports (keep only last 10)
 async function cleanupDriveExports() {
     try {
@@ -132,6 +147,8 @@ async function exportCustomersBalances() {
         await uploadToDrive(filePath, fileName);
 
         await cleanupDriveExports();
+
+        cleanupLocalExports();
 
         // Clean up locally after upload
         if (fs.existsSync(filePath)) {

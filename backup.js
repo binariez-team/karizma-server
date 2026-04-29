@@ -6,8 +6,8 @@ const fs = require('fs');
 const zlib = require('zlib');
 const { google } = require('googleapis');
 
-const BACKUP_RETENTION_DAYS = process.env.BACKUP_RETENTION_DAYS;
-const BACKUP_NAME = process.env.BACKUP_NAME;
+const BACKUP_RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS, 10) || 3;
+const BACKUP_NAME = process.env.BACKUP_NAME || 'backup';
 
 // Prepare backup directory
 const backupsFolder = path.join(__dirname, 'backups');
@@ -93,7 +93,7 @@ async function cleanupDriveBackups() {
 
     try {
         const list = await drive.files.list({
-            q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false`,
+            q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name contains '${BACKUP_NAME}'`,
             fields: 'files(id, name, createdTime)'
         });
 
