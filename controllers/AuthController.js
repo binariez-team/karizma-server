@@ -1,5 +1,7 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/UserModel");
+const SystemSecret = require("../models/SystemSecretModel");
+const bcrypt = require("bcryptjs");
 
 exports.login = async (req, res, next) => {
     const io = req.io;
@@ -47,6 +49,56 @@ exports.login = async (req, res, next) => {
         } else {
             res.status(401).send("Incorrect username or password!");
         }
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Verify the reports password
+ */
+exports.verifyReportsPassword = async (req, res, next) => {
+    try {
+        const { password } = req.body;
+
+        if (!password) {
+            return res.status(400).json({ message: "Password is required!" });
+        }
+
+        const isValid = await SystemSecret.verifySecret("reports_password", password);
+
+        if (isValid) {
+            return res.status(200).json({ success: true, message: "Password verified." });
+        } else {
+            return res.status(401).json({ success: false, message: "Incorrect password!" });
+        }
+    } catch (error) {
+        next(error);
+    }
+};
+
+/**
+ * Change the reports password
+ */
+exports.changeReportsPassword = async (req, res, next) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ message: "Current and new passwords are required!" });
+        }
+
+        // 1. Verify current password
+        const isCurrentValid = await SystemSecret.verifySecret("reports_password", currentPassword);
+
+        if (!isCurrentValid) {
+            return res.status(401).json({ success: false, message: "Current password is incorrect!" });
+        }
+
+        // 2. Update to new password
+        await SystemSecret.updateSecret("reports_password", newPassword);
+
+        return res.status(200).json({ success: true, message: "Password updated successfully!" });
     } catch (error) {
         next(error);
     }

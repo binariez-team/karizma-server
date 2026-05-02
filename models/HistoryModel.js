@@ -105,9 +105,13 @@ class History {
             sql += ` AND O.customer_id = ?`;
             params.push(criteria.customer_id);
         }
-        if (criteria.invoice_date) {
-            sql += ` AND DATE(order_datetime) = ?`;
-            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` GROUP BY O.order_id
@@ -143,9 +147,13 @@ class History {
             sql += ` AND so.invoice_number LIKE ?`;
             params.push(`%${criteria.invoice_number}`);
         }
-        if (criteria.invoice_date) {
-            sql += ` AND DATE(order_datetime) = ?`;
-            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` ORDER BY order_datetime DESC`;
@@ -219,9 +227,13 @@ class History {
             sql += ` AND I.partner_id_fk = ?`;
             params.push(criteria.partner_id);
         }
-        if (criteria.payment_date) {
-            sql += ` AND DATE(P.journal_date) = ?`;
-            params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(P.journal_date) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(P.journal_date) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` ORDER BY payment_date DESC, P.journal_number DESC
@@ -256,9 +268,13 @@ class History {
             sql += ` AND RO.customer_id = ?`;
             params.push(criteria.customer_id);
         }
-        if (criteria.invoice_date) {
-            sql += ` AND DATE(order_datetime) = ?`;
-            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` GROUP BY RO.order_id
@@ -299,9 +315,13 @@ class History {
             sql += ` AND DP.invoice_number = ?`;
             params.push(criteria.invoice_number);
         }
-        if (criteria.dispose_date) {
-            sql += ` AND DATE(DP.dispose_datetime) = ?`;
-            params.push(moment(criteria.dispose_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(DP.dispose_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(DP.dispose_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` GROUP BY DP.dispose_id 
