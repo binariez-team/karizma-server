@@ -10,14 +10,14 @@ class DeliverInvoice {
 
             moment.tz.setDefault("Asia/Beirut");
             order.order_datetime = moment(order.order_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
             order.admin_id_fk = user.database_id;
 
             // insert into deliver_orders
             const [result] = await connection.query(
                 `INSERT INTO deliver_orders SET ?`,
-                order
+                order,
             );
 
             // inserted order ID
@@ -25,12 +25,12 @@ class DeliverInvoice {
 
             // generate invoice_number
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 1000) + 1 AS number FROM deliver_orders`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 1000) + 1 AS number FROM deliver_orders`,
             );
             let invoice_number = `DEL${number.toString().padStart(4, "0")}`;
             await connection.query(
                 `UPDATE deliver_orders SET invoice_number = ? WHERE order_id = ?`,
-                [invoice_number, order_id]
+                [invoice_number, order_id],
             );
 
             //	********************************
@@ -39,6 +39,7 @@ class DeliverInvoice {
 
             for (const record of items) {
                 delete record.product_name;
+                delete record.stock;
 
                 // insert into order items
                 await connection.query(
@@ -46,7 +47,7 @@ class DeliverInvoice {
                     {
                         ...record,
                         order_id_fk: order_id,
-                    }
+                    },
                 );
 
                 // add admin record to inventory transactions
@@ -55,7 +56,7 @@ class DeliverInvoice {
                         record.product_id
                     }, ${
                         order.admin_id_fk
-                    }, ${-record.quantity}, 'DELIVER', '${invoice_number}', ${order_id});`
+                    }, ${-record.quantity}, 'DELIVER', '${invoice_number}', ${order_id});`,
                 );
             }
 
@@ -77,13 +78,13 @@ class DeliverInvoice {
 
             moment.tz.setDefault("Asia/Beirut");
             order.order_datetime = moment(order.order_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
             order.admin_id_fk = user.database_id;
 
             let [[checkPending]] = await connection.query(
                 `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0`,
-                [order.order_id]
+                [order.order_id],
             );
             if (!checkPending) throw new Error("approved");
 
@@ -96,18 +97,18 @@ class DeliverInvoice {
                     order.database_id,
                     order.notes,
                     order.order_id,
-                ]
+                ],
             );
 
             await connection.query(
                 `DELETE FROM inventory_transactions WHERE transaction_type = 'DELIVER' AND order_id_fk = ? AND database_id = ?`,
-                [order.order_id, user.database_id]
+                [order.order_id, user.database_id],
             );
 
             //delete invoice items
             await connection.query(
                 `DELETE FROM deliver_order_items WHERE order_id_fk = ?`,
-                [order.order_id]
+                [order.order_id],
             );
 
             //	********************************
@@ -116,6 +117,7 @@ class DeliverInvoice {
 
             for (const record of items) {
                 delete record.product_name;
+                delete record.stock;
 
                 // insert into order items
                 await connection.query(
@@ -123,7 +125,7 @@ class DeliverInvoice {
                     {
                         ...record,
                         order_id_fk: order.order_id,
-                    }
+                    },
                 );
 
                 // add admin record to inventory transactions
@@ -132,7 +134,7 @@ class DeliverInvoice {
                         record.product_id
                     }, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER', '${
                         order.invoice_number
-                    }', ${order.order_id});`
+                    }', ${order.order_id});`,
                 );
             }
 
@@ -153,25 +155,25 @@ class DeliverInvoice {
 
             let [[checkPending]] = await connection.query(
                 `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0 AND admin_id_fk = ?`,
-                [order_id, database_id]
+                [order_id, database_id],
             );
             if (!checkPending) throw new Error("approved");
 
             await connection.query(
                 `DELETE FROM inventory_transactions WHERE transaction_type = 'DELIVER' AND order_id_fk = ? AND database_id = ?`,
-                [order_id, database_id]
+                [order_id, database_id],
             );
 
             //delete invoice items
             await connection.query(
                 `UPDATE deliver_order_items SET is_deleted = 1 WHERE order_id_fk = ?`,
-                [order_id]
+                [order_id],
             );
 
             //delete invoice
             await connection.query(
                 `UPDATE deliver_orders SET is_deleted = 1 WHERE order_id = ?`,
-                [order_id]
+                [order_id],
             );
             await connection.commit();
         } catch (error) {
