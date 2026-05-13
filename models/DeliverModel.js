@@ -50,7 +50,7 @@ class DeliverInvoice {
                     },
                 );
 
-                // add admin record to inventory transactions
+                // add record to inventory transactions
                 await connection.query(
                     `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (${
                         record.product_id
@@ -58,6 +58,21 @@ class DeliverInvoice {
                         order.admin_id_fk
                     }, ${-record.quantity}, 'DELIVER', '${invoice_number}', ${order_id});`,
                 );
+
+                if (order.admin_id_fk == 1) {
+                    console.log("called");
+
+                    // update product costs
+                    await connection.query(
+                        `UPDATE inventory SET unit_cost_usd = ?, avg_cost_usd = ? WHERE product_id_fk = ? AND database_id = ?`,
+                        [
+                            record.unit_price,
+                            record.unit_price,
+                            record.product_id,
+                            order.admin_id_fk,
+                        ],
+                    );
+                }
             }
 
             // after successfull
