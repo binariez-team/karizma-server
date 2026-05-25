@@ -49,11 +49,11 @@ class BalanceModel {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'TRA%'`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'TRA%'`,
             );
 
             let payment_number = `TRA${number.toString().padStart(4, "0")}`;
@@ -61,13 +61,13 @@ class BalanceModel {
             //get receiver account name
             let [[receiver]] = await connection.query(
                 `SELECT first_name FROM users WHERE database_id = ?`,
-                [paymentData.to_database_id]
+                [paymentData.to_database_id],
             );
 
             //get sender account name
             let [[sender]] = await connection.query(
                 `SELECT first_name FROM users WHERE database_id = ?`,
-                [database_id]
+                [database_id],
             );
 
             //insert to vouchers and journal_items
@@ -95,7 +95,7 @@ class BalanceModel {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                firstItem
+                firstItem,
             );
 
             const secondItem = {
@@ -110,7 +110,7 @@ class BalanceModel {
             };
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem
+                secondItem,
             );
 
             await connection.commit();
@@ -129,7 +129,7 @@ class BalanceModel {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
             //insert to vouchers and journal_items
@@ -145,12 +145,12 @@ class BalanceModel {
 
             await connection.query(
                 `UPDATE journal_items SET debit = ? WHERE journal_id_fk = ? AND database_id != ?`,
-                [paymentData.amount, paymentData.journal_id, database_id]
+                [paymentData.amount, paymentData.journal_id, database_id],
             );
 
             await connection.query(
                 `UPDATE journal_items SET credit = WHERE journal_id_fk = ? AND database_id = ?`,
-                [paymentData.amount, paymentData.journal_id, database_id]
+                [paymentData.amount, paymentData.journal_id, database_id],
             );
 
             await connection.commit();
@@ -172,18 +172,18 @@ class BalanceModel {
                 inner join journal_vouchers jv 
                 ON jv.journal_id = ji.journal_id_fk 
                 WHERE journal_id_fk = ? AND jv.database_id = ?`,
-                [journal_id, database_id]
+                [journal_id, database_id],
             );
             journal_items = journal_items.map((item) => item.journal_item_id);
 
             await connection.query(
                 `UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,
-                [journal_items]
+                [journal_items],
             );
 
             await connection.query(
                 `UPDATE journal_vouchers SET is_deleted = 1 WHERE journal_id = ? AND database_id = ?`,
-                [journal_id, database_id]
+                [journal_id, database_id],
             );
 
             await connection.commit();
@@ -196,15 +196,6 @@ class BalanceModel {
     }
 
     static async getTransferAccounts(database_id) {
-        // const query = `SELECT
-        // 	u.database_id,
-        //     d.database_name,
-        // 	u.first_name,
-        // 	u.last_name,
-        // 	CONCAT(u.first_name, ' ', u.last_name) AS full_name
-        // FROM users u
-        // INNER JOIN user_database d ON u.database_id = d.database_id
-        // 	WHERE u.database_id != ? AND u.is_deleted = 0;`;
         const query = `SELECT d.*, CONCAT(u.first_name, ' ', u.last_name) AS full_name FROM user_database d
         INNER JOIN users u ON d.database_id = u.database_id
         WHERE u.user_type != 'staff' AND u.is_deleted = 0 AND u.database_id != ?`;

@@ -1,18 +1,17 @@
 const express = require("express");
 const router = express.Router();
 
-const AdminHistoryController = require("../controllers/AdminHistoryController");
+const {
+    fetchDeliverHistory,
+    fetchMoneyTransferHistory,
+    fetchPurchaseHistory,
+    fetchSuppliersPaymentHistory,
+} = require("../controllers/AdminHistoryController");
 
-router.post("/deliver/search", AdminHistoryController.fetchDeliverHistory);
-router.post(
-	"/money-transfer/search",
-	AdminHistoryController.fetchMoneyTransferHistory
-);
+router.post("/deliver/search", fetchDeliverHistory);
+router.post("/money-transfer/search", fetchMoneyTransferHistory);
 
-router.post("/purchase/search", AdminHistoryController.fetchPurchaseHistory);
-router.post(
-	"/suppliers-payment/search",
-	AdminHistoryController.fetchSuppliersPaymentHistory
-);
+router.post("/purchase/search", fetchPurchaseHistory);
+router.post("/suppliers-payment/search", fetchSuppliersPaymentHistory);
 
 module.exports = router;

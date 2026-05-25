@@ -2,11 +2,11 @@ const AdminHistory = require("../models/AdminHistoryModel");
 
 exports.fetchDeliverHistory = async (req, res, next) => {
     try {
-        let criteria = req.body;
+        const criteria = req.body;
         const { database_id } = req.user;
         let invoices = await AdminHistory.fetchDeliverHistory(
             criteria,
-            database_id
+            database_id,
         );
         res.status(200).send(invoices);
     } catch (error) {
@@ -16,8 +16,12 @@ exports.fetchDeliverHistory = async (req, res, next) => {
 
 exports.fetchMoneyTransferHistory = async (req, res, next) => {
     try {
-        let criteria = req.body;
-        let invoices = await AdminHistory.fetchMoneyTransferHistory(criteria);
+        const criteria = req.body;
+        const { database_id } = req.user;
+        let invoices = await AdminHistory.fetchMoneyTransferHistory(
+            database_id,
+            criteria,
+        );
         res.status(200).send(invoices);
     } catch (error) {
         next(error);
@@ -41,7 +45,7 @@ exports.fetchSuppliersPaymentHistory = async (req, res, next) => {
         let criteria = req.body;
         let payments = await AdminHistory.fetchSuppliersPaymentHistory(
             database_id,
-            criteria
+            criteria,
         );
         res.status(200).send(payments);
     } catch (error) {

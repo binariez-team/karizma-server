@@ -39,17 +39,17 @@ class AdminHistory {
     }
 
     // fetch moneyTransfer for admin
-    static async fetchMoneyTransferHistory(criteria) {
+    static async fetchMoneyTransferHistory(database_id, criteria) {
         let sql = `SELECT 
         	U.first_name AS first_name,
 			U.last_name AS last_name,
         	jv.*,
         	DATE(jv.journal_date) AS order_date
 			FROM journal_vouchers jv 
-			INNER JOIN users U ON U.database_id = jv.database_id
-			WHERE jv.journal_description ="Transfer"
+			INNER JOIN users U ON U.database_id = jv.database_id AND U.user_type != 'staff'
+			WHERE jv.database_id = ? AND jv.journal_description ="Transfer"
 			AND jv.is_deleted = 0 `;
-        const params = [];
+        const params = [database_id];
         if (criteria.invoice_number) {
             sql += ` AND jv.journal_number = ?`;
             params.push(criteria.invoice_number);
@@ -63,10 +63,7 @@ class AdminHistory {
             params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` ORDER BY order_date DESC, jv.journal_number DESC
-        LIMIT ? OFFSET ?`;
-        params.push(criteria.limit || 100);
-        params.push(criteria.offset || 0);
+        sql += ` ORDER BY order_date DESC, jv.journal_number DESC`;
 
         const [rows] = await pool.query(sql, params);
         return rows;

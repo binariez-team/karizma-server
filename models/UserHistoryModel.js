@@ -90,118 +90,6 @@ class UserHistory {
         return rows;
     }
 
-    // approve pending invoice
-    // static async approvePendingInvoice(id, database_id, admin_id) {
-    //     const connection = await pool.getConnection();
-    //     try {
-    //         await connection.beginTransaction();
-
-    //         // check if the deliver order id has already been approved
-    //         let [[check]] = await connection.query(
-    //             `SELECT is_approved FROM deliver_orders WHERE order_id = ?`,
-    //             [id]
-    //         );
-
-    //         if (check && check.is_approved == 1) {
-    //             await connection.rollback();
-    //             return { status: "error", message: "Already approved!" };
-    //             // throw new Error("Already approved!");
-    //         }
-
-    //         await connection.query(
-    //             `UPDATE deliver_orders SET is_approved = 1 WHERE order_id = ?`,
-    //             id
-    //         );
-
-    //         //	********************************
-    //         //	loop of each invoice item record
-    //         //	********************************
-
-    //         let [items] = await connection.query(
-    //             `SELECT * FROM deliver_order_items WHERE order_id_fk = ? and is_deleted = 0`,
-    //             id
-    //         );
-    //         for (const record of items) {
-    //             // check if inventory records has previously inserted
-    //             let [[inserted]] = await connection.query(
-    //                 `SELECT * FROM inventory WHERE product_id_fk = ? AND database_id = ? AND is_deleted = 0;`,
-    //                 [record.product_id, database_id]
-    //             );
-
-    //             // if records have not been inserted before
-    //             if (!inserted) {
-    //                 // prepare default inventory record costs and prices (created by admin)
-    //                 let [[rows]] = await connection.query(
-    //                     `SELECT * FROM inventory WHERE database_id = ? AND product_id_fk = ?;`,
-    //                     [admin_id, record.product_id]
-    //                 );
-    //                 let {
-    //                     unit_cost_usd,
-    //                     avg_cost_usd,
-    //                     grandwhole_price_usd,
-    //                     whole_price_usd,
-    //                     unit_price_usd,
-    //                 } = rows;
-    //                 const inventoryRecord = {
-    //                     product_id_fk: record.product_id,
-    //                     database_id: database_id,
-    //                     unit_cost_usd: unit_cost_usd,
-    //                     avg_cost_usd: avg_cost_usd,
-    //                     grandwhole_price_usd: grandwhole_price_usd,
-    //                     whole_price_usd: whole_price_usd,
-    //                     unit_price_usd: unit_price_usd,
-    //                 };
-    //                 // insert a new inventory record with default prices
-    //                 await connection.query(
-    //                     `INSERT INTO inventory SET ?`,
-    //                     inventoryRecord
-    //                 );
-    //             } else {
-    //                 // calculate avg cost
-
-    //                 // get quantity for the receiving user
-    //                 let [[rows]] = await connection.query(
-    //                     `SELECT SUM(quantity) as quantity FROM inventory_transactions WHERE database_id = ? AND product_id_fk = ? AND is_deleted = 0;`,
-    //                     [database_id, record.product_id]
-    //                 );
-    //                 let { quantity } = rows;
-
-    //                 // safe check quantity
-    //                 if(quantity < 0){
-    //                     quantity = 0;
-    //                 }
-
-    //                 // calculate avg_cost_usd
-    //                 let avg_cost_usd = (quantity + record.quantity) / quantity;
-
-    //                 // update avg_cost_usd
-    //                 await connection.query(
-    //                     `UPDATE inventory SET avg_cost_usd = ? WHERE database_id = ? AND product_id_fk = ?`,
-    //                     [avg_cost_usd, database_id, record.product_id]
-    //                 );
-
-    //             }
-
-    //             // add user record to inventory transactions
-    //             await connection.query(
-    //                 `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type) VALUES (${record.product_id}, ${database_id}, ${record.quantity}, 'DELIVER');`
-    //             );
-    //         }
-
-    //         // after successfull
-    //         await connection.commit();
-
-    //         return {
-    //             status: "success",
-    //             message: "Invoice approved successfully!",
-    //         };
-    //     } catch (error) {
-    //         await connection.rollback();
-    //         throw error;
-    //     } finally {
-    //         connection.release();
-    //     }
-    // }
     static async approvePendingInvoice(id, database_id, admin_id) {
         const connection = await pool.getConnection();
 
@@ -211,7 +99,7 @@ class UserHistory {
             // 1. Check if already approved
             const [[check]] = await connection.query(
                 `SELECT is_approved FROM deliver_orders WHERE order_id = ?`,
-                [id]
+                [id],
             );
 
             if (check?.is_approved === 1) {
@@ -222,7 +110,7 @@ class UserHistory {
             // 1.1 Check if the order is deleted
             const [[checkDeleted]] = await connection.query(
                 `SELECT is_deleted FROM deliver_orders WHERE order_id = ?`,
-                [id]
+                [id],
             );
             if (checkDeleted?.is_deleted === 1) {
                 await connection.rollback();
@@ -232,7 +120,7 @@ class UserHistory {
             // 2. Approve order
             await connection.query(
                 `UPDATE deliver_orders SET is_approved = 1 WHERE order_id = ?`,
-                [id]
+                [id],
             );
 
             // 3. Fetch invoice items
@@ -240,7 +128,7 @@ class UserHistory {
                 `SELECT product_id, quantity, unit_price
                 FROM deliver_order_items
                 WHERE order_id_fk = ? AND is_deleted = 0`,
-                [id]
+                [id],
             );
 
             for (const record of items) {
@@ -256,7 +144,7 @@ class UserHistory {
                  WHERE product_id_fk = ?
                    AND database_id = ?
                    AND is_deleted = 0`,
-                    [record.product_id, database_id]
+                    [record.product_id, database_id],
                 );
 
                 // 5. Create inventory if missing (copy from admin)
@@ -271,7 +159,7 @@ class UserHistory {
                      WHERE database_id = ?
                        AND product_id_fk = ?
                        AND is_deleted = 0`,
-                        [admin_id, record.product_id]
+                        [admin_id, record.product_id],
                     );
 
                     await connection.query(`INSERT INTO inventory SET ?`, {
@@ -294,7 +182,7 @@ class UserHistory {
                      WHERE product_id_fk = ?
                        AND database_id = ?
                        AND is_deleted = 0`,
-                        [record.product_id, database_id]
+                        [record.product_id, database_id],
                     );
 
                     const currentQty = Math.max(qtyRow.quantity, 0);
@@ -306,7 +194,7 @@ class UserHistory {
                      WHERE product_id_fk = ?
                        AND database_id = ?
                        AND is_deleted = 0`,
-                        [record.product_id, database_id]
+                        [record.product_id, database_id],
                     );
 
                     const currentAvgCost = costRow?.avg_cost_usd ?? 0;
@@ -334,7 +222,7 @@ class UserHistory {
                             incomingUnitCost,
                             record.product_id,
                             database_id,
-                        ]
+                        ],
                     );
                 }
 
@@ -343,7 +231,7 @@ class UserHistory {
                     `INSERT INTO inventory_transactions
                  (product_id_fk, database_id, quantity, transaction_type, order_id_fk)
                  VALUES (?, ?, ?, 'DELIVER', ?)`,
-                    [record.product_id, database_id, incomingQty, id]
+                    [record.product_id, database_id, incomingQty, id],
                 );
             }
 
@@ -363,7 +251,11 @@ class UserHistory {
 
     //fetch transfer history
     static async fetchUserMoneyTransferHistory(database_id, criteria) {
-        let sql = ` SELECT jv.journal_id,jv.journal_number,jv.journal_date as payment_date,jv.total_value
+        let sql = ` SELECT
+        jv.journal_id,
+        jv.journal_number,
+        jv.journal_date as payment_date,
+        jv.total_value
         FROM journal_vouchers jv
         WHERE jv.database_id = ? AND jv.journal_description = 'Transfer'
         AND jv.is_deleted = 0`;
@@ -376,10 +268,7 @@ class UserHistory {
             sql += ` AND DATE(jv.journal_date) = ?`;
             params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
         }
-        sql += ` ORDER BY payment_date DESC, jv.journal_number DESC
-		LIMIT ? OFFSET ?`;
-        params.push(criteria.limit || 100);
-        params.push(criteria.offset || 0);
+        sql += ` ORDER BY payment_date DESC, jv.journal_number DESC`;
 
         const [transfers] = await pool.query(sql, params);
         return transfers;

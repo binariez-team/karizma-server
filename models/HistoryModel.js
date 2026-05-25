@@ -115,10 +115,7 @@ class History {
         }
 
         sql += ` GROUP BY O.order_id
-        ORDER BY order_date DESC, O.invoice_number DESC
-        LIMIT ? OFFSET ?`;
-        params.push(criteria.limit || 100);
-        params.push(criteria.offset || 0);
+        ORDER BY order_date DESC, O.invoice_number DESC`;
 
         const [rows] = await pool.query(sql, params);
         return rows;

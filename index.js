@@ -60,6 +60,7 @@ app.use("/report", auth, ReportRoutes);
 app.use("/return", auth, ReturnRoutes);
 app.use("/dispose", auth, require("./routes/dispose.routes"));
 app.use("/staff", auth, require("./routes/staff.routes"));
+app.use("/transfer", auth, require("./routes/transfer.routes"));
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);

@@ -7,7 +7,7 @@ exports.getProductHistoryById = async (req, res, next) => {
         const database_id = req.user.database_id;
         const history = await History.getProductHistoryById(
             product_id,
-            database_id
+            database_id,
         );
         res.status(200).send(history);
     } catch (error) {
@@ -29,7 +29,7 @@ exports.fetchOrderItemsById = async (req, res, next) => {
 // sales
 exports.fetchSalesHistory = async (req, res, next) => {
     try {
-        const database_id = req.user.database_id;
+        const { database_id } = req.user;
         let criteria = req.body;
         let invoices = await History.fetchSalesHistory(database_id, criteria);
         res.status(200).send(invoices);
@@ -46,7 +46,7 @@ exports.fetchProductsSalesHistory = async (req, res, next) => {
 
         const data = await History.fetchProductsSalesHistory(
             database_id,
-            criteria
+            criteria,
         );
         res.status(200).send(data);
     } catch (error) {
@@ -93,7 +93,7 @@ exports.fetchDisposeHistory = async (req, res, next) => {
         let criteria = req.body;
         let disposals = await History.fetchDisposeHistory(
             database_id,
-            criteria
+            criteria,
         );
         res.status(200).send(disposals);
     } catch (error) {
