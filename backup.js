@@ -4,9 +4,11 @@ const mysqldump = require('mysqldump');
 const path = require('path');
 const fs = require('fs');
 const zlib = require('zlib');
+const { pipeline } = require('stream/promises');
 const { google } = require('googleapis');
 
-const BACKUP_RETENTION_DAYS = parseInt(process.env.BACKUP_RETENTION_DAYS, 10) || 3;
+const parsedRetention = parseInt(process.env.BACKUP_RETENTION_DAYS, 10);
+const BACKUP_RETENTION_DAYS = Number.isFinite(parsedRetention) ? parsedRetention : 3;
 const BACKUP_NAME = process.env.BACKUP_NAME || 'backup';
 
 // Prepare backup directory
@@ -72,37 +74,68 @@ async function uploadToDrive(filePath, fileName) {
     }
 }
 
+// Parse the timestamp embedded in the backup filename (Beirut local time)
+// Filename pattern: <BACKUP_NAME>_YYYY-MM-DD HH:MM:SS.sql.gz
+function parseBackupDateFromName(file) {
+    const m = file.match(/_(\d{4}-\d{2}-\d{2}) (\d{1,2}):(\d{2}):(\d{2})\.sql\.gz$/);
+    if (!m) return null;
+    const hh = String(m[2]).padStart(2, '0');
+    return new Date(`${m[1]}T${hh}:${m[3]}:${m[4]}+03:00`);
+}
+
 // 🧹 Cleanup Local Backups
 function cleanupLocalBackups() {
     const cutoff = Date.now() - BACKUP_RETENTION_DAYS * 24 * 60 * 60 * 1000;
 
-    fs.readdirSync(backupsFolder).forEach(file => {
+    for (const file of fs.readdirSync(backupsFolder)) {
         const filePath = path.join(backupsFolder, file);
-        const stats = fs.statSync(filePath);
 
-        if (stats.mtimeMs < cutoff) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑 Removed local old backup: ${file}`);
+        let stats;
+        try {
+            stats = fs.statSync(filePath);
+        } catch (e) {
+            console.error(`stat failed for ${file}:`, e.message);
+            continue;
         }
-    });
+        if (!stats.isFile()) continue;
+
+        const fromName = parseBackupDateFromName(file);
+        const fileTime = fromName ? fromName.getTime() : stats.mtimeMs;
+
+        if (fileTime < cutoff) {
+            try {
+                fs.unlinkSync(filePath);
+                console.log(`🗑 Removed local old backup: ${file}`);
+            } catch (e) {
+                console.error(`Failed to delete ${file}:`, e.message);
+            }
+        }
+    }
 }
 
 // 🧹 Cleanup Drive backups older than X days
 async function cleanupDriveBackups() {
     const cutoffDate = new Date(Date.now() - BACKUP_RETENTION_DAYS * 864e5).toISOString();
+    let pageToken;
 
     try {
-        const list = await drive.files.list({
-            q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name contains '${BACKUP_NAME}'`,
-            fields: 'files(id, name, createdTime)'
-        });
+        do {
+            const list = await drive.files.list({
+                q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name contains '${BACKUP_NAME}'`,
+                fields: 'nextPageToken, files(id, name, createdTime)',
+                pageSize: 1000,
+                pageToken
+            });
 
-        for (const f of list.data.files) {
-            if (f.createdTime < cutoffDate) {
-                await drive.files.delete({ fileId: f.id });
-                console.log(`☁️🗑 Removed Drive backup: ${f.name}`);
+            for (const f of list.data.files || []) {
+                if (f.createdTime < cutoffDate) {
+                    await drive.files.delete({ fileId: f.id });
+                    console.log(`☁️🗑 Removed Drive backup: ${f.name}`);
+                }
             }
-        }
+
+            pageToken = list.data.nextPageToken;
+        } while (pageToken);
     } catch (err) {
         console.error("❌ Drive Cleanup Error:", err.message);
     }
@@ -131,20 +164,19 @@ async function backupDatabase() {
 
         console.log(`✔ SQL saved locally`);
 
-        const gzip = zlib.createGzip();
-        fs.createReadStream(sqlPath)
-            .pipe(gzip)
-            .pipe(fs.createWriteStream(gzPath))
-            .on('finish', async () => {
-                console.log(`🗜 Created compressed backup`);
+        await pipeline(
+            fs.createReadStream(sqlPath),
+            zlib.createGzip(),
+            fs.createWriteStream(gzPath)
+        );
+        console.log(`🗜 Created compressed backup`);
 
-                fs.unlinkSync(sqlPath);
+        fs.unlinkSync(sqlPath);
 
-                await uploadToDrive(gzPath, gzFile);
+        await uploadToDrive(gzPath, gzFile);
 
-                await cleanupLocalBackups();
-                await cleanupDriveBackups();
-            });
+        cleanupLocalBackups();
+        await cleanupDriveBackups();
 
     } catch (err) {
         console.error("❌ Backup failed:", err.message);

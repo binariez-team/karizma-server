@@ -64,30 +64,61 @@ function escapeCSV(val) {
     return str;
 }
 
+// Parse the timestamp embedded in the export filename (Beirut local time)
+// Filename pattern: customers_balances_YYYY_MM_DD_HH_MM_SS.csv
+function parseExportDateFromName(file) {
+    const m = file.match(/customers_balances_(\d{4})_(\d{2})_(\d{2})_(\d{2})_(\d{2})_(\d{2})\.csv$/);
+    if (!m) return null;
+    return new Date(`${m[1]}-${m[2]}-${m[3]}T${m[4]}:${m[5]}:${m[6]}+03:00`);
+}
+
 // 🧹 Cleanup local exports older than 1 day
 function cleanupLocalExports() {
     const cutoff = Date.now() - 1 * 24 * 60 * 60 * 1000;
 
-    fs.readdirSync(exportsFolder).forEach(file => {
+    for (const file of fs.readdirSync(exportsFolder)) {
         const filePath = path.join(exportsFolder, file);
-        const stats = fs.statSync(filePath);
 
-        if (stats.mtimeMs < cutoff) {
-            fs.unlinkSync(filePath);
-            console.log(`🗑 Removed old local export: ${file}`);
+        let stats;
+        try {
+            stats = fs.statSync(filePath);
+        } catch (e) {
+            console.error(`stat failed for ${file}:`, e.message);
+            continue;
         }
-    });
+        if (!stats.isFile()) continue;
+
+        const fromName = parseExportDateFromName(file);
+        const fileTime = fromName ? fromName.getTime() : stats.mtimeMs;
+
+        if (fileTime < cutoff) {
+            try {
+                fs.unlinkSync(filePath);
+                console.log(`🗑 Removed old local export: ${file}`);
+            } catch (e) {
+                console.error(`Failed to delete ${file}:`, e.message);
+            }
+        }
+    }
 }
 
 // 🧹 Cleanup Drive exports (keep only last 10)
 async function cleanupDriveExports() {
     try {
-        const list = await drive.files.list({
-            q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name contains 'customers_balances_'`,
-            fields: "files(id, name, createdTime)",
-        });
+        const files = [];
+        let pageToken;
 
-        const files = list.data.files || [];
+        do {
+            const list = await drive.files.list({
+                q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name contains 'customers_balances_'`,
+                fields: "nextPageToken, files(id, name, createdTime)",
+                pageSize: 1000,
+                pageToken,
+            });
+            if (list.data.files) files.push(...list.data.files);
+            pageToken = list.data.nextPageToken;
+        } while (pageToken);
+
         // Sort by createdTime descending (newest first)
         files.sort((a, b) => new Date(b.createdTime) - new Date(a.createdTime));
 
