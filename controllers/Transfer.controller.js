@@ -26,9 +26,11 @@ exports.getAll = async (req, res, next) => {
 // create transfer
 exports.createTransfer = async (req, res, next) => {
     try {
+        const io = req.io;
         const { database_id } = req.user;
         const transferData = req.body;
         const transfer = await Transfer.create(database_id, transferData);
+        io.emit("transferAdded", transferData.to_database_id);
         res.status(200).json(transfer);
     } catch (error) {
         next(error);
@@ -38,6 +40,7 @@ exports.createTransfer = async (req, res, next) => {
 // update transfer
 exports.updateTransfer = async (req, res, next) => {
     try {
+        const io = req.io;
         const { database_id } = req.user;
         const { transfer_id } = req.params;
         const transferData = req.body;
@@ -46,6 +49,7 @@ exports.updateTransfer = async (req, res, next) => {
             transfer_id,
             transferData,
         );
+        io.emit("transferUpdated", transferData.to_database_id);
         res.status(200).json(transfer);
     } catch (error) {
         next(error);
@@ -55,10 +59,14 @@ exports.updateTransfer = async (req, res, next) => {
 // delete transfer
 exports.deleteTransfer = async (req, res, next) => {
     try {
+        const io = req.io;
         const { database_id } = req.user;
         const { transfer_id } = req.params;
-        const transfer = await Transfer.delete(database_id, transfer_id);
-        res.status(200).json(transfer);
+        const to_database_id = await Transfer.delete(database_id, transfer_id);
+        io.emit("transferDeleted", to_database_id);
+        res.status(200).json({
+            message: "Transfer Deleted !",
+        });
     } catch (error) {
         next(error);
     }
@@ -67,13 +75,17 @@ exports.deleteTransfer = async (req, res, next) => {
 // confirmTransfer
 exports.confirmTransfer = async (req, res, next) => {
     try {
+        const io = req.io;
         const { database_id } = req.user;
         const { transfer_id } = req.params;
-        const transfer = await Transfer.confirmTransfer(
+        const socketData = await Transfer.confirmTransfer(
             database_id,
             transfer_id,
         );
-        res.status(200).json(transfer);
+        io.emit("transferConfirmed", socketData);
+        res.status(200).json({
+            message: "Transfer Confirmed !",
+        });
     } catch (error) {
         next(error);
     }

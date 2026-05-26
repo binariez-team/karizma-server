@@ -297,7 +297,7 @@ class Transfer {
 
             await connection.commit();
 
-            return { message: "Transfer deleted successfully" };
+            return oldTransfer.to_database_id;
         } catch (error) {
             await connection.rollback();
             throw error;
@@ -379,6 +379,11 @@ class Transfer {
             );
 
             await connection.commit();
+
+            return {
+                name: receiver.first_name,
+                database_id: transferData.from_database_id,
+            };
         } catch (error) {
             await connection.rollback();
             throw error;

@@ -33,21 +33,21 @@ exports.getAllUsersBalance = async (req, res, next) => {
 };
 
 //transfer money
-exports.transferMoney = async (req, res, next) => {
-    const { database_id } = req.user;
-    const paymentData = req.body;
+// exports.transferMoney = async (req, res, next) => {
+//     const { database_id } = req.user;
+//     const paymentData = req.body;
 
-    const io = req.io;
+//     const io = req.io;
 
-    try {
-        const transfer = await Balance.transferMoney(database_id, paymentData);
+//     try {
+//         const transfer = await Balance.transferMoney(database_id, paymentData);
 
-        io.emit("transferAdded", paymentData.to_database_id);
-        res.status(200).json(transfer);
-    } catch (error) {
-        next(error);
-    }
-};
+//         io.emit("transferAdded", paymentData.to_database_id);
+//         res.status(200).json(transfer);
+//     } catch (error) {
+//         next(error);
+//     }
+// };
 
 //update transfer
 exports.updateTransfer = async (req, res, next) => {
@@ -92,7 +92,7 @@ exports.getCashTransactions = async (req, res, next) => {
         const results = await Balance.getCashTransactions(
             start,
             end,
-            database_id
+            database_id,
         );
         res.status(200).send(results);
     } catch (error) {

@@ -14,9 +14,9 @@ router.get("/transactions/:start&:end", BalanceController.getCashTransactions);
 router.post("/correct", BalanceController.correctBalance);
 
 //money transfer
-router.post("/transfer", BalanceController.transferMoney);
-router.put("/transfer", BalanceController.updateTransfer);
-router.delete("/transfer/:id", BalanceController.deleteTransfer);
+// router.post("/transfer", BalanceController.transferMoney);
+// router.put("/transfer", BalanceController.updateTransfer);
+// router.delete("/transfer/:id", BalanceController.deleteTransfer);
 
 router.get("/transfer/accounts", BalanceController.getTransferAccounts);
 
