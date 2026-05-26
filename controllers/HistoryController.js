@@ -100,3 +100,14 @@ exports.fetchDisposeHistory = async (req, res, next) => {
         next(error);
     }
 };
+
+exports.fetchDisposeItemsHistory = async (req, res, next) => {
+    try {
+        const database_id = req.user.database_id;
+        const criteria = req.body;
+        const data = await History.fetchDisposeItemsHistory(database_id, criteria);
+        res.status(200).send(data);
+    } catch (error) {
+        next(error);
+    }
+};

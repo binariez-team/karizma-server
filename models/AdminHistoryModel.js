@@ -16,16 +16,20 @@ class AdminHistory {
 				WHERE O.is_deleted = 0 AND O.admin_id_fk = ?`;
         const params = [database_id];
         if (criteria.invoice_number) {
-            sql += ` AND O.invoice_number = ?`;
-            params.push(criteria.invoice_number);
+            sql += ` AND O.invoice_number LIKE ?`;
+            params.push(`%${criteria.invoice_number}%`);
         }
         if (criteria.database_id) {
             sql += ` AND O.database_id = ?`;
             params.push(criteria.database_id);
         }
-        if (criteria.order_date) {
-            sql += ` AND DATE(order_datetime) = ?`;
-            params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` GROUP BY O.order_id
@@ -85,16 +89,20 @@ class AdminHistory {
             WHERE PO.is_deleted = 0`;
         const params = [];
         if (criteria.invoice_number) {
-            sql += ` AND PO.invoice_number = ?`;
-            params.push(criteria.invoice_number);
+            sql += ` AND PO.invoice_number LIKE ?`;
+            params.push(`%${criteria.invoice_number}%`);
         }
         if (criteria.supplier_id) {
             sql += ` AND PO.partner_id_fk = ?`;
             params.push(criteria.supplier_id);
         }
-        if (criteria.invoice_date) {
-            sql += ` AND DATE(order_datetime) = ?`;
-            params.push(moment(criteria.invoice_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` GROUP BY PO.order_id
@@ -122,16 +130,20 @@ class AdminHistory {
 					WHERE P.is_deleted = 0 AND P.database_id = ? AND journal_description = 'Supplier Payment'`;
         const params = [database_id];
         if (criteria.payment_number) {
-            sql += ` AND P.journal_number = ?`;
-            params.push(criteria.payment_number);
+            sql += ` AND P.journal_number LIKE ?`;
+            params.push(`%${criteria.payment_number}%`);
         }
         if (criteria.partner_id) {
             sql += ` AND I.partner_id_fk = ?`;
             params.push(criteria.partner_id);
         }
-        if (criteria.payment_date) {
-            sql += ` AND DATE(P.journal_date) = ?`;
-            params.push(moment(criteria.payment_date).format("yyyy-MM-DD"));
+        if (criteria.start_date) {
+            sql += ` AND DATE(P.journal_date) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(P.journal_date) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
         sql += ` ORDER BY payment_date DESC, P.journal_number DESC

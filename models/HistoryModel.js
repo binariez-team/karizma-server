@@ -330,6 +330,38 @@ class History {
         const [rows] = await pool.query(sql, params);
         return rows;
     }
+
+    // fetch dispose items history
+    static async fetchDisposeItemsHistory(database_id, criteria) {
+        let sql = `SELECT dpi.*, p.sku, p.product_name, dp.invoice_number, dp.dispose_datetime
+            FROM dispose_products_items dpi
+            INNER JOIN dispose_products dp ON dpi.dispose_id = dp.dispose_id
+            INNER JOIN products p ON dpi.product_id = p.product_id
+            WHERE dp.is_deleted = 0
+            AND dp.database_id = ?`;
+        const params = [database_id];
+        if (criteria.product_id) {
+            sql += ` AND dpi.product_id = ?`;
+            params.push(criteria.product_id);
+        }
+        if (criteria.invoice_number) {
+            sql += ` AND dp.invoice_number LIKE ?`;
+            params.push(`%${criteria.invoice_number}%`);
+        }
+        if (criteria.start_date) {
+            sql += ` AND DATE(dp.dispose_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(dp.dispose_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
+        }
+
+        sql += ` ORDER BY dp.dispose_datetime DESC`;
+
+        const [rows] = await pool.query(sql, params);
+        return rows;
+    }
 }
 
 module.exports = History;

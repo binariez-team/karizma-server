@@ -15,5 +15,6 @@ router.post("/returns/details", HistoryController.fetchReturnOrderItemsById);
 
 router.post("/payment/search", HistoryController.fetchPaymentHistory);
 router.post("/dispose/search", HistoryController.fetchDisposeHistory);
+router.post("/dispose-items/search", HistoryController.fetchDisposeItemsHistory);
 
 module.exports = router;
