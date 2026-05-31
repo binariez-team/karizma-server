@@ -9,15 +9,13 @@ router.get("/user", BalanceController.getBalanceByUserId);
 router.get("/all", admin, BalanceController.getAllUsersBalance);
 
 // get cash transactions history
-router.get("/transactions/:start&:end", BalanceController.getCashTransactions);
-// correct cash balance manually
-router.post("/correct", BalanceController.correctBalance);
-
-//money transfer
-// router.post("/transfer", BalanceController.transferMoney);
-// router.put("/transfer", BalanceController.updateTransfer);
-// router.delete("/transfer/:id", BalanceController.deleteTransfer);
+router.get(
+    "/transactions/:start&:end&:account",
+    BalanceController.getCashTransactions,
+);
 
 router.get("/transfer/accounts", BalanceController.getTransferAccounts);
+
+router.post("/self-transfer", BalanceController.selfTransfer);
 
 module.exports = router;

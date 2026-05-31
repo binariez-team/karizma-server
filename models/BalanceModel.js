@@ -6,13 +6,30 @@ class BalanceModel {
     // get balance
     static async getBalance(database_id) {
         const [_531] = await Account.getIdByAccountNumber("531");
-        const query = `SELECT COALESCE(sum(debit) - sum(credit),0) AS balance
-        FROM journal_items ji
-        where ji.is_deleted = 0
-        AND ji.account_id_fk = ?
-		AND ji.database_id = ?`;
+        const [_532] = await Account.getIdByAccountNumber("532");
 
-        const [[rows]] = await pool.query(query, [_531.id, database_id]);
+        const query = `SELECT
+                COALESCE(SUM(CASE 
+                WHEN ji.account_id_fk = ? AND ji.database_id = ? 
+                THEN ji.debit - ji.credit 
+                ELSE 0 
+                END), 0) AS cash_balance,
+            
+                COALESCE(SUM(CASE 
+                WHEN ji.account_id_fk = ? AND ji.database_id = ? 
+                THEN ji.debit - ji.credit 
+                ELSE 0 
+                END), 0) AS whish_balance
+            
+            FROM journal_items ji
+            WHERE ji.is_deleted = 0;`;
+
+        const [[rows]] = await pool.query(query, [
+            _531.id,
+            database_id,
+            _532.id,
+            database_id,
+        ]);
 
         return rows;
     }
@@ -41,160 +58,6 @@ class BalanceModel {
         return rows;
     }
 
-    //transfer money
-    static async transferMoney(database_id, paymentData) {
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
-
-            moment.tz.setDefault("Asia/Beirut");
-            paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
-            );
-
-            let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'TRA%'`,
-            );
-
-            let payment_number = `TRA${number.toString().padStart(4, "0")}`;
-
-            //get receiver account name
-            let [[receiver]] = await connection.query(
-                `SELECT first_name FROM users WHERE database_id = ?`,
-                [paymentData.to_database_id],
-            );
-
-            //get sender account name
-            let [[sender]] = await connection.query(
-                `SELECT first_name FROM users WHERE database_id = ?`,
-                [database_id],
-            );
-
-            //insert to vouchers and journal_items
-            let query = `INSERT INTO journal_vouchers ( database_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
-            const [journal_voucher] = await connection.query(query, [
-                database_id,
-                payment_number,
-                paymentData.payment_date,
-                `Transfer`,
-                paymentData.amount,
-            ]);
-
-            let [_531] = await Account.getIdByAccountNumber("531");
-
-            const firstItem = {
-                database_id: paymentData.to_database_id,
-                journal_id_fk: journal_voucher.insertId,
-                journal_date: paymentData.payment_date,
-                account_id_fk: _531.id,
-                partner_id_fk: null,
-                debit: paymentData.amount,
-                credit: 0,
-                notes: `From ${sender.first_name}`,
-            };
-
-            await connection.query(
-                `INSERT INTO journal_items SET ?`,
-                firstItem,
-            );
-
-            const secondItem = {
-                database_id: database_id,
-                journal_id_fk: journal_voucher.insertId,
-                journal_date: paymentData.payment_date,
-                account_id_fk: _531.id,
-                partner_id_fk: paymentData.customer_id,
-                debit: 0,
-                credit: paymentData.amount,
-                notes: `To ${receiver.first_name}`,
-            };
-            await connection.query(
-                `INSERT INTO journal_items SET ?`,
-                secondItem,
-            );
-
-            await connection.commit();
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
-    }
-
-    static async updateTransfer(database_id, paymentData) {
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
-
-            moment.tz.setDefault("Asia/Beirut");
-            paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
-            );
-
-            //insert to vouchers and journal_items
-            let query = `UPDATE journal_vouchers SET total_value = ? WHERE journal_id = ? and database_id = ?`;
-            const [journal_voucher] = await connection.query(query, [
-                // paymentData.payment_date,
-                paymentData.amount,
-                paymentData.journal_id,
-                database_id,
-            ]);
-
-            let [_531] = await Account.getIdByAccountNumber("531");
-
-            await connection.query(
-                `UPDATE journal_items SET debit = ? WHERE journal_id_fk = ? AND database_id != ?`,
-                [paymentData.amount, paymentData.journal_id, database_id],
-            );
-
-            await connection.query(
-                `UPDATE journal_items SET credit = WHERE journal_id_fk = ? AND database_id = ?`,
-                [paymentData.amount, paymentData.journal_id, database_id],
-            );
-
-            await connection.commit();
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
-    }
-
-    static async deleteTransfer(database_id, journal_id) {
-        const connection = await pool.getConnection();
-        try {
-            await connection.beginTransaction();
-
-            let [journal_items] = await connection.query(
-                `SELECT journal_item_id FROM journal_items ji
-                inner join journal_vouchers jv 
-                ON jv.journal_id = ji.journal_id_fk 
-                WHERE journal_id_fk = ? AND jv.database_id = ?`,
-                [journal_id, database_id],
-            );
-            journal_items = journal_items.map((item) => item.journal_item_id);
-
-            await connection.query(
-                `UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,
-                [journal_items],
-            );
-
-            await connection.query(
-                `UPDATE journal_vouchers SET is_deleted = 1 WHERE journal_id = ? AND database_id = ?`,
-                [journal_id, database_id],
-            );
-
-            await connection.commit();
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
-        }
-    }
-
     static async getTransferAccounts(database_id) {
         const query = `SELECT d.*, CONCAT(u.first_name, ' ', u.last_name) AS full_name FROM user_database d
         INNER JOIN users u ON d.database_id = u.database_id
@@ -204,8 +67,9 @@ class BalanceModel {
     }
 
     // get cash transaction history
-    static async getCashTransactions(start, end, database_id) {
-        const [_531] = await Account.getIdByAccountNumber("531");
+    static async getCashTransactions(start, end, database_id, accountNumber) {
+        const [account] = await Account.getIdByAccountNumber(accountNumber);
+
         let query = `WITH partner_balance AS (
             SELECT
                 SUM(CASE WHEN ji.debit IS NOT NULL THEN ji.debit ELSE 0 END) AS debit,
@@ -258,15 +122,88 @@ class BalanceModel {
         journal_datetime ASC`;
 
         const [rows] = await pool.query(query, [
-            _531.id,
+            account.id,
             start,
             database_id,
-            _531.id,
+            account.id,
             start,
             end,
             database_id,
         ]);
         return rows;
+    }
+
+    // self transfer
+    static async selfTransfer(database_id, data) {
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            moment.tz.setDefault("Asia/Beirut");
+            const transfer_date = moment().format(`YYYY-MM-DD HH:mm:ss`);
+
+            //insert to vouchers and journal_items
+            let query = `INSERT INTO journal_vouchers ( database_id, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?)`;
+            const [journal_voucher] = await connection.query(query, [
+                database_id,
+                transfer_date,
+                `Self Transfer`,
+                data.amount,
+            ]);
+
+            // cash account
+            const [cashAccount] = await Account.getIdByAccountNumber("531");
+
+            // whish account
+            const [whishAccount] = await Account.getIdByAccountNumber("532");
+
+            let cashAccountEntry = {
+                database_id: database_id,
+                journal_id_fk: journal_voucher.insertId,
+                journal_date: transfer_date,
+                account_id_fk: cashAccount.id,
+            };
+
+            let whishAccountEntry = {
+                database_id: database_id,
+                journal_id_fk: journal_voucher.insertId,
+                journal_date: transfer_date,
+                account_id_fk: whishAccount.id,
+            };
+
+            // if transaction is from cash to whish
+            if (data.from_account == 531) {
+                cashAccountEntry.credit = data.amount;
+                cashAccountEntry.notes = `Cash To Whish`;
+
+                whishAccountEntry.debit = data.amount;
+                whishAccountEntry.notes = `Cash To Whish`;
+            } else {
+                // else transaction is from whish to cash
+                cashAccountEntry.debit = data.amount;
+                cashAccountEntry.notes = `Whish To Cash`;
+
+                whishAccountEntry.credit = data.amount;
+                whishAccountEntry.notes = `Whish To Cash`;
+            }
+
+            await connection.query(
+                `INSERT INTO journal_items SET ?`,
+                cashAccountEntry,
+            );
+
+            await connection.query(
+                `INSERT INTO journal_items SET ?`,
+                whishAccountEntry,
+            );
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 }
 

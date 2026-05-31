@@ -32,47 +32,6 @@ exports.getAllUsersBalance = async (req, res, next) => {
     }
 };
 
-//transfer money
-// exports.transferMoney = async (req, res, next) => {
-//     const { database_id } = req.user;
-//     const paymentData = req.body;
-
-//     const io = req.io;
-
-//     try {
-//         const transfer = await Balance.transferMoney(database_id, paymentData);
-
-//         io.emit("transferAdded", paymentData.to_database_id);
-//         res.status(200).json(transfer);
-//     } catch (error) {
-//         next(error);
-//     }
-// };
-
-//update transfer
-exports.updateTransfer = async (req, res, next) => {
-    const { database_id } = req.user;
-    const paymentData = req.body;
-    try {
-        const transfer = await Balance.updateTransfer(database_id, paymentData);
-        res.status(200).json(transfer);
-    } catch (error) {
-        next(error);
-    }
-};
-
-//delete transfer
-exports.deleteTransfer = async (req, res, next) => {
-    const { database_id } = req.user;
-    const journal_id = req.params.id;
-    try {
-        const transfer = await Balance.deleteTransfer(database_id, journal_id);
-        res.status(200).json(transfer);
-    } catch (error) {
-        next(error);
-    }
-};
-
 //get transfer accounts
 exports.getTransferAccounts = async (req, res, next) => {
     try {
@@ -88,11 +47,12 @@ exports.getTransferAccounts = async (req, res, next) => {
 exports.getCashTransactions = async (req, res, next) => {
     try {
         const { database_id } = req.user;
-        const { start, end } = req.params;
+        const { start, end, account } = req.params;
         const results = await Balance.getCashTransactions(
             start,
             end,
             database_id,
+            account,
         );
         res.status(200).send(results);
     } catch (error) {
@@ -100,5 +60,14 @@ exports.getCashTransactions = async (req, res, next) => {
     }
 };
 
-// correct balance
-exports.correctBalance = async (req, res, next) => {};
+// self transfer
+exports.selfTransfer = async (req, res, next) => {
+    try {
+        const { database_id } = req.user;
+        const data = req.body;
+        const result = await Balance.selfTransfer(database_id, data);
+        res.status(200).json(result);
+    } catch (error) {
+        next(error);
+    }
+};

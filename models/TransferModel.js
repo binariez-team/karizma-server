@@ -23,6 +23,7 @@ class Transfer {
             mt.transfer_number,
             mt.transfer_datetime,
             mt.amount,
+            mt.money_account,
             mt.from_database_id,
             mt.to_database_id,
             mt.is_approved,
@@ -123,14 +124,16 @@ class Transfer {
                 transferData.amount,
             ]);
 
-            let [_531] = await Account.getIdByAccountNumber("531");
+            const [selectedMoneyAccount] = await Account.getIdByAccountNumber(
+                transferData.money_account,
+            );
 
             // from database
             const fromDatabase = {
                 database_id: database_id,
                 journal_id_fk: journal_voucher.insertId,
                 journal_date: transferData.transfer_datetime,
-                account_id_fk: _531.id,
+                account_id_fk: selectedMoneyAccount.id,
                 partner_id_fk: transferData.customer_id,
                 debit: 0,
                 credit: transferData.amount,
@@ -142,12 +145,13 @@ class Transfer {
             );
 
             // NEW CODE
-            const TransferQuery = `INSERT INTO money_transfers (journal_id, transfer_number, transfer_datetime, amount, from_database_id, to_database_id, is_approved) VALUES (?, ?, ?, ?, ?, ?, 0)`;
+            const TransferQuery = `INSERT INTO money_transfers (journal_id, transfer_number, transfer_datetime, amount, money_account, from_database_id, to_database_id, is_approved) VALUES (?, ?, ?, ?, ?, ?, ?, 0)`;
             await connection.query(TransferQuery, [
                 journal_voucher.insertId,
                 payment_number,
                 transferData.transfer_datetime,
                 transferData.amount,
+                transferData.money_account,
                 database_id,
                 transferData.to_database_id,
             ]);
@@ -177,16 +181,21 @@ class Transfer {
                 throw new Error("Transfer already confirmed");
             }
 
+            if (oldTransfer.from_database_id != database_id) {
+                throw new Error("You can't update this transfer");
+            }
+
             moment.tz.setDefault("Asia/Beirut");
             transferData.transfer_datetime = moment(
                 transferData.transfer_datetime,
             ).format(`YYYY-MM-DD HH:mm:ss`);
 
             // update money_transfer record
-            const updateTransferQuery = `UPDATE money_transfers SET transfer_datetime = ?, amount = ? WHERE transfer_id = ?`;
+            const updateTransferQuery = `UPDATE money_transfers SET transfer_datetime = ?, amount = ?, money_account = ? WHERE transfer_id = ?`;
             await connection.query(updateTransferQuery, [
                 transferData.transfer_datetime,
                 transferData.amount,
+                transferData.money_account,
                 transfer_id,
             ]);
 
@@ -204,53 +213,20 @@ class Transfer {
                 [transferData.to_database_id],
             );
 
+            const [selectedMoneyAccount] = await Account.getIdByAccountNumber(
+                transferData.money_account,
+            );
+
             // update journal items
-            const updateJournalItemsQuery = `UPDATE journal_items SET journal_date = ?, credit = ?, notes = ? WHERE journal_id_fk = ? AND database_id = ?`;
+            const updateJournalItemsQuery = `UPDATE journal_items SET journal_date = ?, account_id_fk = ?, credit = ?, notes = ? WHERE journal_id_fk = ? AND database_id = ?`;
             await connection.query(updateJournalItemsQuery, [
                 transferData.transfer_datetime,
+                selectedMoneyAccount.id,
                 transferData.amount,
                 `To ${receiver.first_name}`,
                 oldTransfer.journal_id,
                 database_id,
             ]);
-
-            // get transfer data
-            // let [[transferData]] = await connection.query(
-            //     `SELECT * FROM money_transfers WHERE transfer_id = ?`,
-            //     [transfer_id],
-            // );
-
-            // const TransferQuery = `UPDATE money_transfers SET is_approved = 1 WHERE transfer_id = ? AND from_database_id = ?`;
-            // await connection.query(TransferQuery, [
-            //     transferData.transfer_id,
-            //     transferData.from_database_id,
-            // ]);
-
-            // // update journal items
-            // let [_531] = await Account.getIdByAccountNumber("531");
-            // let [_951] = await Account.getIdByAccountNumber("951");
-
-            // // from database
-            // await connection.query(
-            //     `UPDATE journal_items SET credit = ? WHERE journal_id_fk = ? AND database_id = ? AND account_id_fk = ?`,
-            //     [
-            //         transferData.amount,
-            //         transferData.journal_id_fk,
-            //         transferData.database_id,
-            //         _531.id,
-            //     ],
-            // );
-
-            // // to database
-            // await connection.query(
-            //     `UPDATE journal_items SET debit = ? WHERE journal_id_fk = ? AND database_id = ? AND account_id_fk = ?`,
-            //     [
-            //         transferData.amount,
-            //         transferData.journal_id_fk,
-            //         transferData.database_id,
-            //         _951.id,
-            //     ],
-            // );
 
             await connection.commit();
 
@@ -325,6 +301,10 @@ class Transfer {
                 throw new Error("Transfer already confirmed");
             }
 
+            if (oldTransfer.to_database_id !== database_id) {
+                throw new Error("You can't confirm this transfer");
+            }
+
             // get transfer data
             let [[transferData]] = await connection.query(
                 `SELECT * FROM money_transfers WHERE transfer_id = ?`,
@@ -338,7 +318,9 @@ class Transfer {
                 transferData.from_database_id,
             ]);
 
-            let [_531] = await Account.getIdByAccountNumber("531");
+            const [moneyAccount] = await Account.getIdByAccountNumber(
+                transferData.money_account,
+            );
 
             //get sender account name
             let [[sender]] = await connection.query(
@@ -366,8 +348,7 @@ class Transfer {
                 database_id: transferData.to_database_id,
                 journal_id_fk: transferData.journal_id,
                 journal_date: transferData.transfer_datetime,
-                account_id_fk: _531.id,
-                partner_id_fk: null,
+                account_id_fk: moneyAccount.id,
                 debit: transferData.amount,
                 credit: 0,
                 notes: `From ${sender.first_name}`,

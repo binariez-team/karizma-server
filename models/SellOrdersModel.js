@@ -126,66 +126,132 @@ class SellOrders {
             }
 
             if (payment) {
-                // payment.payment_date = moment(payment.payment_date).format(
-                // 	`YYYY-MM-DD ${moment().format("HH:mm:ss")}`
-                // );
-                payment.payment_date = moment(order.order_datetime)
-                    .add(1, "seconds")
-                    .format(`YYYY-MM-DD HH:mm:ss`);
+                const [_413] = await Accounts.getIdByAccountNumber("413");
 
-                let [[{ number }]] = await connection.query(
-                    `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`,
-                );
+                // register cash payment
+                if (payment.cash_amount) {
+                    payment.payment_date = moment(order.order_datetime)
+                        .add(1, "seconds")
+                        .format(`YYYY-MM-DD HH:mm:ss`);
 
-                let payment_number = `PAY${number.toString().padStart(4, "0")}`;
+                    let [[{ number }]] = await connection.query(
+                        `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`,
+                    );
 
-                //insert to vouchers and journal_items
-                let query = `INSERT INTO journal_vouchers ( database_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
-                const [journal_voucher] = await connection.query(query, [
-                    database_id,
-                    payment_number,
-                    payment.payment_date,
-                    "Payment Received",
-                    payment.amount,
-                ]);
+                    let payment_number = `PAY${number.toString().padStart(4, "0")}`;
 
-                let [_531] = await Accounts.getIdByAccountNumber("531");
-                const customer_name = await Customer.getCustomerNameById(
-                    payment.customer_id,
-                );
+                    //insert to vouchers and journal_items
+                    let query = `INSERT INTO journal_vouchers ( database_id, journal_number, journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?, ?, ?)`;
+                    const [journal_voucher] = await connection.query(query, [
+                        database_id,
+                        payment_number,
+                        payment.payment_date,
+                        "Payment Received",
+                        "531",
+                        payment.cash_amount,
+                    ]);
 
-                const firstItem = {
-                    database_id: database_id,
-                    journal_id_fk: journal_voucher.insertId,
-                    journal_date: payment.payment_date,
-                    account_id_fk: _531.id,
-                    reference_number: payment.reference_number,
-                    partner_id_fk: null,
-                    debit: payment.amount,
-                    credit: 0,
-                    notes: customer_name,
-                };
+                    const [_531] = await Accounts.getIdByAccountNumber("531");
+                    // const [_532] = await Accounts.getIdByAccountNumber("532");
 
-                await connection.query(
-                    `INSERT INTO journal_items SET ?`,
-                    firstItem,
-                );
+                    const customer_name = await Customer.getCustomerNameById(
+                        payment.customer_id,
+                    );
 
-                let [_413] = await Accounts.getIdByAccountNumber("413");
-                const secondItem = {
-                    database_id: database_id,
-                    journal_id_fk: journal_voucher.insertId,
-                    journal_date: payment.payment_date,
-                    account_id_fk: _413.id,
-                    reference_number: payment.reference_number,
-                    partner_id_fk: payment.customer_id,
-                    debit: 0,
-                    credit: payment.amount,
-                };
-                await connection.query(
-                    `INSERT INTO journal_items SET ?`,
-                    secondItem,
-                );
+                    const firstItem = {
+                        database_id: database_id,
+                        journal_id_fk: journal_voucher.insertId,
+                        journal_date: payment.payment_date,
+                        account_id_fk: _531.id,
+                        reference_number: payment.reference_number,
+                        partner_id_fk: null,
+                        debit: payment.cash_amount,
+                        credit: 0,
+                        notes: customer_name,
+                    };
+
+                    await connection.query(
+                        `INSERT INTO journal_items SET ?`,
+                        firstItem,
+                    );
+
+                    const secondItem = {
+                        database_id: database_id,
+                        journal_id_fk: journal_voucher.insertId,
+                        journal_date: payment.payment_date,
+                        account_id_fk: _413.id,
+                        reference_number: payment.reference_number,
+                        partner_id_fk: payment.customer_id,
+                        debit: 0,
+                        credit: payment.cash_amount,
+                    };
+                    await connection.query(
+                        `INSERT INTO journal_items SET ?`,
+                        secondItem,
+                    );
+                }
+
+                // register whish payment
+                if (payment.whish_amount) {
+                    payment.payment_date = moment(order.order_datetime)
+                        .add(1, "seconds")
+                        .format(`YYYY-MM-DD HH:mm:ss`);
+
+                    const [[{ number }]] = await connection.query(
+                        `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`,
+                    );
+
+                    const payment_number = `PAY${number.toString().padStart(4, "0")}`;
+
+                    //insert to vouchers and journal_items
+                    const query = `INSERT INTO journal_vouchers ( database_id, journal_number, journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?, ?, ?)`;
+                    const [journal_voucher] = await connection.query(query, [
+                        database_id,
+                        payment_number,
+                        payment.payment_date,
+                        "Payment Received",
+                        "532",
+                        payment.whish_amount,
+                    ]);
+
+                    const [_532] = await Accounts.getIdByAccountNumber("532");
+
+                    const customer_name = await Customer.getCustomerNameById(
+                        payment.customer_id,
+                    );
+
+                    const firstItem = {
+                        database_id: database_id,
+                        journal_id_fk: journal_voucher.insertId,
+                        journal_date: payment.payment_date,
+                        account_id_fk: _532.id,
+                        reference_number: payment.reference_number,
+                        partner_id_fk: null,
+                        debit: payment.whish_amount,
+                        credit: 0,
+                        notes: customer_name,
+                    };
+
+                    await connection.query(
+                        `INSERT INTO journal_items SET ?`,
+                        firstItem,
+                    );
+
+                    const secondItem = {
+                        database_id: database_id,
+                        journal_id_fk: journal_voucher.insertId,
+                        journal_date: payment.payment_date,
+                        account_id_fk: _413.id,
+                        reference_number: payment.reference_number,
+                        partner_id_fk: payment.customer_id,
+                        debit: 0,
+                        credit: payment.whish_amount,
+                    };
+                    await connection.query(
+                        `INSERT INTO journal_items SET ?`,
+                        secondItem,
+                    );
+                }
             }
 
             await connection.commit();

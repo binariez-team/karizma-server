@@ -12,35 +12,38 @@ class Payment {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`,
             );
 
             let payment_number = `PAY${number.toString().padStart(4, "0")}`;
 
             //insert to vouchers and journal_items
-            let query = `INSERT INTO journal_vouchers ( database_id, journal_number, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?, ?)`;
+            let query = `INSERT INTO journal_vouchers ( database_id, journal_number, journal_date, journal_description, journal_notes, total_value) VALUES (?, ?, ?, ?, ?, ?)`;
             const [journal_voucher] = await connection.query(query, [
                 database_id,
                 payment_number,
                 paymentData.payment_date,
                 "Payment Received",
+                paymentData.money_account,
                 paymentData.amount,
             ]);
 
-            let [_531] = await Accounts.getIdByAccountNumber("531");
+            let [moneyAccount] = await Accounts.getIdByAccountNumber(
+                paymentData.money_account,
+            );
             const customer_name = await Customer.getCustomerNameById(
-                paymentData.account_id
+                paymentData.account_id,
             );
 
             const firstItem = {
                 database_id: database_id,
                 journal_id_fk: journal_voucher.insertId,
                 journal_date: paymentData.payment_date,
-                account_id_fk: _531.id,
+                account_id_fk: moneyAccount.id,
                 reference_number: paymentData.reference_number,
                 partner_id_fk: null,
                 debit: paymentData.amount,
@@ -50,7 +53,7 @@ class Payment {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                firstItem
+                firstItem,
             );
 
             let [_413] = await Accounts.getIdByAccountNumber("413");
@@ -66,7 +69,7 @@ class Payment {
             };
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem
+                secondItem,
             );
 
             await connection.commit();
@@ -87,30 +90,34 @@ class Payment {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
             //insert to vouchers and journal_items
-            let query = `UPDATE journal_vouchers SET total_value = ? WHERE journal_id = ? and database_id = ?`;
-            const [journal_voucher] = await connection.query(query, [
+            let query = `UPDATE journal_vouchers SET total_value = ?, journal_notes = ? WHERE journal_id = ? and database_id = ?`;
+            await connection.query(query, [
                 paymentData.amount,
+                paymentData.money_account,
                 paymentData.journal_id,
                 database_id,
             ]);
 
-            let [_531] = await Accounts.getIdByAccountNumber("531");
+            const [moneyAccount] = await Accounts.getIdByAccountNumber(
+                paymentData.money_account,
+            );
+
+            const [_413] = await Accounts.getIdByAccountNumber("413");
 
             await connection.query(
-                `UPDATE journal_items SET debit = ?, journal_date = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
+                `UPDATE journal_items SET debit = ?, journal_date = ?, account_id_fk = ? WHERE journal_id_fk = ? AND account_id_fk != ?`,
                 [
                     paymentData.amount,
                     paymentData.payment_date,
+                    moneyAccount.id,
                     paymentData.journal_id,
-                    _531.id,
-                ]
+                    _413.id,
+                ],
             );
-
-            let [_413] = await Accounts.getIdByAccountNumber("413");
 
             await connection.query(
                 `UPDATE journal_items SET credit = ?, journal_date = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
@@ -119,7 +126,7 @@ class Payment {
                     paymentData.payment_date,
                     paymentData.journal_id,
                     _413.id,
-                ]
+                ],
             );
 
             await connection.commit();
@@ -141,18 +148,18 @@ class Payment {
                 inner join journal_vouchers jv 
                 ON jv.journal_id = ji.journal_id_fk 
                 WHERE journal_id_fk = ? AND jv.database_id = ?`,
-                [journal_id, database_id]
+                [journal_id, database_id],
             );
             journal_items = journal_items.map((item) => item.journal_item_id);
 
             await connection.query(
                 `UPDATE journal_items SET is_deleted = 1 WHERE journal_item_id in (?)`,
-                [journal_items]
+                [journal_items],
             );
 
             await connection.query(
                 `UPDATE journal_vouchers SET is_deleted = 1 WHERE journal_id = ? AND database_id = ?`,
-                [journal_id, database_id]
+                [journal_id, database_id],
             );
 
             await connection.commit();
@@ -175,7 +182,8 @@ class Payment {
                 A.account_id AS partner_id,
 				JV.*,
                 JV.total_value as amount,
-				JV.journal_date AS payment_date
+				JV.journal_date AS payment_date,
+                JV.journal_notes AS money_account
                 FROM journal_vouchers JV
                 INNER JOIN journal_items I ON JV.journal_id = I.journal_id_fk
                 INNER JOIN accounts A ON I.partner_id_fk = A.account_id
@@ -192,11 +200,11 @@ class Payment {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD HH:mm:ss`
+                `YYYY-MM-DD HH:mm:ss`,
             );
 
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'REC%'`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'REC%'`,
             );
 
             let payment_number = `REC${number.toString().padStart(4, "0")}`;
@@ -225,7 +233,7 @@ class Payment {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                firstItem
+                firstItem,
             );
 
             let [_401] = await Accounts.getIdByAccountNumber("401");
@@ -241,7 +249,7 @@ class Payment {
             };
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem
+                secondItem,
             );
 
             await connection.commit();
@@ -261,7 +269,7 @@ class Payment {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD HH:mm:ss`
+                `YYYY-MM-DD HH:mm:ss`,
             );
 
             //insert to vouchers and journal_items
@@ -281,7 +289,7 @@ class Payment {
                     paymentData.payment_date,
                     paymentData.journal_id,
                     _531.id,
-                ]
+                ],
             );
 
             let [_401] = await Accounts.getIdByAccountNumber("401");
@@ -293,7 +301,7 @@ class Payment {
                     paymentData.payment_date,
                     paymentData.journal_id,
                     _401.id,
-                ]
+                ],
             );
 
             await connection.commit();

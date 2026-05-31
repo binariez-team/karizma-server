@@ -8,37 +8,26 @@ class Expense {
         expenseNumber,
         startDate,
         endDate,
-        database_id
+        database_id,
     ) {
-        // cash account
-        const [_531] = await Accounts.getIdByAccountNumber("531");
-
-        // params
-        const params = [database_id];
-        params.push(_531.id);
         let sql = `SELECT
         jv.journal_id,
         jv.journal_number,
         jv.journal_description,
-        jv.journal_date as payment_date,
+        jv.journal_date,
         jv.total_value,
-        ji.account_id_fk
+        jv.journal_notes as money_account
 
         FROM journal_vouchers jv
 
-        INNER JOIN journal_items ji ON jv.journal_id = ji.journal_id_fk
-
 		WHERE jv.database_id = ?
-        AND ji.account_id_fk != ?
-        AND ji.is_deleted = 0`;
+        AND jv.is_deleted = 0`;
+
+        const params = [database_id];
 
         if (expenseNumber) {
             sql += ` AND jv.journal_number LIKE ?`;
-            if (expenseNumber.substr(0, 3) === "EXP") {
-                params.push(`%${expenseNumber}`);
-            } else {
-                params.push(`%EXP${expenseNumber}`);
-            }
+            params.push(`%${expenseNumber}%`);
         } else {
             sql += ` AND jv.journal_number LIKE 'EXP%' `;
         }
@@ -51,7 +40,7 @@ class Expense {
             params.push(endDate);
         }
 
-        sql += ` ORDER BY payment_date DESC `;
+        sql += ` ORDER BY jv.journal_date DESC `;
         if (expenseNumber || startDate || endDate) {
             // do nothing now for LIMITING (no limit)
         } else {
@@ -76,41 +65,41 @@ class Expense {
 
             moment.tz.setDefault("Asia/Beirut");
             paymentData.payment_date = moment(paymentData.payment_date).format(
-                `YYYY-MM-DD HH:mm:ss`
+                `YYYY-MM-DD HH:mm:ss`,
             );
 
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'EXP%'`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'EXP%'`,
             );
 
             let payment_number = `EXP${number.toString().padStart(4, "0")}`;
 
             //insert to vouchers and journal_items
-            let query = `INSERT INTO journal_vouchers (journal_number, journal_date, journal_description, total_value, database_id) VALUES (?, ?, ?, ?, ?)`;
+            let query = `INSERT INTO journal_vouchers (journal_number, journal_date, journal_description, journal_notes, total_value, database_id) VALUES (?, ?, ?, ?, ?, ?)`;
             const [journal_voucher] = await connection.query(query, [
                 payment_number,
                 paymentData.payment_date,
                 paymentData.journal_description,
-                paymentData.amount,
+                paymentData.money_account,
+                paymentData.total_value,
                 database_id,
             ]);
 
-            let [_531] = await Accounts.getIdByAccountNumber("531");
+            let [moneyAccount] = await Accounts.getIdByAccountNumber(
+                paymentData.money_account,
+            );
 
             const cashAccount = {
                 database_id: database_id,
                 journal_id_fk: journal_voucher.insertId,
                 journal_date: paymentData.payment_date,
-                account_id_fk: _531.id,
+                account_id_fk: moneyAccount.id,
                 reference_number: paymentData.reference_number,
-                partner_id_fk: null,
-                debit: 0,
-                credit: paymentData.amount,
-                // notes: paymentData.journal_description,
+                credit: paymentData.total_value,
             };
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                cashAccount
+                cashAccount,
             );
 
             let [_6112] = await Accounts.getIdByAccountNumber("6112");
@@ -121,13 +110,11 @@ class Expense {
                 journal_date: paymentData.payment_date,
                 account_id_fk: _6112.id,
                 reference_number: paymentData.reference_number,
-                partner_id_fk: null,
-                debit: paymentData.amount,
-                credit: 0,
+                debit: paymentData.total_value,
             };
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem
+                secondItem,
             );
 
             await connection.commit();
@@ -151,38 +138,38 @@ class Expense {
             // );
 
             // update journal vouchers and journal items
-            let query = `UPDATE journal_vouchers SET journal_description = ?, total_value = ? WHERE journal_id = ? AND database_id = ?`;
+            let query = `UPDATE journal_vouchers SET journal_description = ?, journal_notes = ?, total_value = ? WHERE journal_id = ? AND database_id = ?`;
             await connection.query(query, [
                 // paymentData.payment_date,
                 paymentData.journal_description,
-                paymentData.amount,
+                paymentData.money_account,
+                paymentData.total_value,
                 paymentData.journal_id,
                 database_id,
             ]);
 
-            let [_531] = await Accounts.getIdByAccountNumber("531");
+            let [moneyAccount] = await Accounts.getIdByAccountNumber(
+                paymentData.money_account,
+            );
+            let [otherAccount] = await Accounts.getIdByAccountNumber("6112");
 
             await connection.query(
-                `UPDATE journal_items SET credit = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
+                `UPDATE journal_items SET credit = ?, account_id_fk = ? WHERE journal_id_fk = ? AND account_id_fk != ?`,
                 [
-                    paymentData.amount,
-                    // paymentData.payment_date,
-                    // paymentData.journal_description,
+                    paymentData.total_value,
+                    moneyAccount.id,
                     paymentData.journal_id,
-                    _531.id,
-                ]
+                    otherAccount.id,
+                ],
             );
 
-            let [_6112] = await Accounts.getIdByAccountNumber("6112");
             await connection.query(
-                `UPDATE journal_items SET debit = ?, account_id_fk = ? WHERE journal_id_fk = ? AND account_id_fk != ?`,
+                `UPDATE journal_items SET debit = ? WHERE journal_id_fk = ? AND account_id_fk = ?`,
                 [
-                    paymentData.amount,
-                    // paymentData.payment_date,
-                    _6112.id,
+                    paymentData.total_value,
                     paymentData.journal_id,
-                    _531.id,
-                ]
+                    otherAccount.id,
+                ],
             );
 
             await connection.commit();
@@ -202,12 +189,12 @@ class Expense {
 
             await connection.query(
                 `DELETE FROM journal_items WHERE journal_id_fk = ? AND database_id = ?`,
-                [journal_id, database_id]
+                [journal_id, database_id],
             );
 
             await connection.query(
                 `DELETE FROM journal_vouchers WHERE journal_id = ? AND database_id = ?`,
-                [journal_id, database_id]
+                [journal_id, database_id],
             );
 
             await connection.commit();

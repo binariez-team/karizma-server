@@ -12,11 +12,11 @@ exports.addOrder = async (req, res, next) => {
             order,
             items,
             database_id,
-            payment
+            payment,
         );
         const new_order = await SellOrders.getAddedOrderById(
             result.order,
-            database_id
+            database_id,
         );
         res.status(201).json(new_order);
     } catch (error) {
@@ -33,7 +33,7 @@ exports.editOrder = async (req, res, next) => {
         const result = await SellOrders.editOrder(order, items, database_id);
         const new_order = await SellOrders.getAddedOrderById(
             result.insertId,
-            database_id
+            database_id,
         );
         res.status(201).json(new_order);
     } catch (error) {
