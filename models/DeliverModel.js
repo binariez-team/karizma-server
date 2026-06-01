@@ -60,8 +60,6 @@ class DeliverInvoice {
                 );
 
                 if (order.admin_id_fk == 1) {
-                    console.log("called");
-
                     // update product costs
                     await connection.query(
                         `UPDATE inventory SET unit_cost_usd = ?, avg_cost_usd = ? WHERE product_id_fk = ? AND database_id = ?`,
