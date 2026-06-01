@@ -18,4 +18,6 @@ router.get("/transfer/accounts", BalanceController.getTransferAccounts);
 
 router.post("/self-transfer", BalanceController.selfTransfer);
 
+router.post("/correct", admin, BalanceController.correctBalance);
+
 module.exports = router;

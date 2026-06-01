@@ -34,6 +34,75 @@ class BalanceModel {
         return rows;
     }
 
+    // correct balance manually
+    static async correctBalance(data, database_id) {
+        const connection = await pool.getConnection();
+
+        try {
+            await connection.beginTransaction();
+
+            moment.tz.setDefault("Asia/Beirut");
+            const date = moment().format(`YYYY-MM-DD HH:mm:ss`);
+
+            // create journal voucher
+            const query = `INSERT INTO journal_vouchers (journal_date, journal_number, journal_notes, journal_description, total_value, reference_number, database_id) VALUES (?, 'Manual Transaction', 'manual', ?, ?, ?, ?)`;
+            const [journal_voucher] = await connection.query(query, [
+                date,
+                data.transaction_notes,
+                data.amount,
+                "manual",
+                database_id,
+            ]);
+
+            // money account
+            const [moneyAccount] = await Account.getIdByAccountNumber(
+                data.money_account,
+            );
+
+            let cashDollar = {
+                journal_id_fk: journal_voucher.insertId,
+                journal_date: date,
+                account_id_fk: moneyAccount.id,
+                reference_number: "manual",
+                database_id: database_id,
+            };
+
+            // capital account
+            let [_101] = await Account.getIdByAccountNumber("101");
+            let capital = {
+                journal_id_fk: journal_voucher.insertId,
+                journal_date: date,
+                account_id_fk: _101.id,
+                reference_number: "manual",
+                database_id: database_id,
+            };
+
+            // check transaction type
+            if (data.transaction_type == "ADD") {
+                cashDollar.debit = data.amount;
+                capital.credit = data.amount;
+            } else {
+                cashDollar.credit = data.amount;
+                capital.debit = data.amount;
+            }
+
+            // create journal entries
+            await connection.query(
+                `INSERT INTO journal_items SET ?`,
+                cashDollar,
+            );
+            await connection.query(`INSERT INTO journal_items SET ?`, capital);
+
+            // commit changes
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
+    }
+
     static async getBalanceByUserId(userId) {
         const [_531] = await Account.getIdByAccountNumber("531");
         const query = `SELECT COALESCE(sum(debit) - sum(credit),0) AS balance 

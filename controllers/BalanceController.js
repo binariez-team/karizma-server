@@ -71,3 +71,20 @@ exports.selfTransfer = async (req, res, next) => {
         next(error);
     }
 };
+
+// correct balance
+exports.correctBalance = async (req, res, next) => {
+    try {
+        const data = req.body;
+
+        const { database_id } = req.user;
+
+        await Balance.correctBalance(data, database_id);
+
+        res.status(201).json({
+            message: "Balance has been updated successfully!",
+        });
+    } catch (error) {
+        next(error);
+    }
+};
