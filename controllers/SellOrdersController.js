@@ -8,6 +8,7 @@ exports.addOrder = async (req, res, next) => {
         delete order.items;
 
         order.database_id = database_id;
+
         const result = await SellOrders.addOrder(
             order,
             items,

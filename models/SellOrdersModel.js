@@ -15,7 +15,8 @@ class SellOrders {
                 `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
-            //insert transactions to new journal_items approch
+            // ##############################################################################################
+            // ####################### create journal voucher and journal items #############################
             let query = `INSERT INTO journal_vouchers (database_id, journal_date, journal_description, total_value) VALUES (?, ?, ?, ?)`;
             const [journal_voucher] = await connection.query(query, [
                 database_id,
@@ -23,42 +24,76 @@ class SellOrders {
                 "Invoice",
                 order.total_amount,
             ]);
+
+            // attach journal voucher id into order object
             order.journal_voucher_id = journal_voucher.insertId;
 
-            let [_4111] = await Accounts.getIdByAccountNumber("4111");
-
-            const firstItem = {
+            // create first common journal item entry for sales
+            // sales goods account
+            const [salesGoodAccount] =
+                await Accounts.getIdByAccountNumber("7011");
+            const salesGood = {
                 journal_id_fk: journal_voucher.insertId,
                 journal_date: order.order_datetime,
-                account_id_fk: _4111.id,
-                partner_id_fk: order.customer_id,
-                reference_number: order.reference_number,
-                debit: order.total_amount,
-                credit: 0,
-                database_id: database_id,
-            };
-
-            await connection.query(
-                `INSERT INTO journal_items SET ?`,
-                firstItem,
-            );
-
-            let [_7011] = await Accounts.getIdByAccountNumber("7011");
-            const secondItem = {
-                journal_id_fk: journal_voucher.insertId,
-                journal_date: order.order_datetime,
-                account_id_fk: _7011.id,
-                reference_number: order.reference_number,
-                partner_id_fk: null,
-                debit: 0,
+                account_id_fk: salesGoodAccount.id,
                 credit: order.total_amount,
                 database_id: database_id,
             };
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem,
+                salesGood,
             );
+
+            if (order.customer_id) {
+                const [receivablesAccount] =
+                    await Accounts.getIdByAccountNumber("4111");
+
+                const firstItem = {
+                    journal_id_fk: journal_voucher.insertId,
+                    journal_date: order.order_datetime,
+                    account_id_fk: receivablesAccount.id,
+                    partner_id_fk: order.customer_id,
+                    debit: order.total_amount,
+                    database_id: database_id,
+                };
+
+                await connection.query(
+                    `INSERT INTO journal_items SET ?`,
+                    firstItem,
+                );
+            } else {
+                if (payment.cash_amount) {
+                    const [cashAccount] =
+                        await Accounts.getIdByAccountNumber("531");
+                    const cashDollar = {
+                        journal_id_fk: journal_voucher.insertId,
+                        journal_date: order.order_datetime,
+                        account_id_fk: cashAccount.id,
+                        debit: payment.cash_amount,
+                        database_id: database_id,
+                    };
+                    await connection.query(
+                        `INSERT INTO journal_items SET ?`,
+                        cashDollar,
+                    );
+                }
+                if (payment.whish_amount) {
+                    const [whishAccount] =
+                        await Accounts.getIdByAccountNumber("532");
+                    const whishDollar = {
+                        journal_id_fk: journal_voucher.insertId,
+                        journal_date: order.order_datetime,
+                        account_id_fk: whishAccount.id,
+                        debit: payment.whish_amount,
+                        database_id: database_id,
+                    };
+                    await connection.query(
+                        `INSERT INTO journal_items SET ?`,
+                        whishDollar,
+                    );
+                }
+            }
 
             const [result] = await connection.query(
                 `INSERT INTO sales_orders SET ?`,
@@ -125,7 +160,7 @@ class SellOrders {
                 await connection.query(queries, params);
             }
 
-            if (payment) {
+            if (payment && order.customer_id) {
                 const [_413] = await Accounts.getIdByAccountNumber("413");
 
                 // register cash payment
@@ -163,10 +198,7 @@ class SellOrders {
                         journal_id_fk: journal_voucher.insertId,
                         journal_date: payment.payment_date,
                         account_id_fk: _531.id,
-                        reference_number: payment.reference_number,
-                        partner_id_fk: null,
                         debit: payment.cash_amount,
-                        credit: 0,
                         notes: customer_name,
                     };
 
@@ -180,9 +212,7 @@ class SellOrders {
                         journal_id_fk: journal_voucher.insertId,
                         journal_date: payment.payment_date,
                         account_id_fk: _413.id,
-                        reference_number: payment.reference_number,
                         partner_id_fk: payment.customer_id,
-                        debit: 0,
                         credit: payment.cash_amount,
                     };
                     await connection.query(

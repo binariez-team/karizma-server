@@ -94,8 +94,8 @@ class History {
             FROM sales_orders O
             INNER JOIN sales_order_items M ON O.order_id = M.order_id
             INNER JOIN products S ON S.product_id = M.product_id
-            INNER JOIN accounts  A ON O.customer_id = A.account_id
-            WHERE O.is_deleted = 0 AND A.database_id = ? `;
+            LEFT JOIN accounts  A ON O.customer_id = A.account_id
+            WHERE O.is_deleted = 0 AND O.database_id = ? `;
         const params = [database_id];
         if (criteria.invoice_number) {
             sql += ` AND O.invoice_number LIKE ?`;
@@ -117,6 +117,8 @@ class History {
         sql += ` GROUP BY O.order_id
         ORDER BY order_date DESC, O.invoice_number DESC`;
 
+        console.log(sql);
+
         const [rows] = await pool.query(sql, params);
         return rows;
     }
@@ -127,7 +129,7 @@ class History {
 			FROM sales_order_items soi 
 			INNER JOIN sales_orders so ON soi.order_id = so.order_id
 			INNER JOIN products p ON soi.product_id = p.product_id
-			INNER JOIN accounts a ON so.customer_id = a.account_id
+			LEFT JOIN accounts a ON so.customer_id = a.account_id
 
 			WHERE soi.is_deleted = 0 
 			AND so.database_id = ? `;
