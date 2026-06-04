@@ -78,7 +78,7 @@ exports.getSupplierBalance = async (req, res, next) => {
             user_id,
             account_id,
             start,
-            end
+            end,
         );
         res.status(200).json(balance);
     } catch (error) {
@@ -93,6 +93,18 @@ exports.getSupplierTotalBalance = async (req, res, next) => {
     try {
         const balance = await Supplier.getSupplierTotalBalance(id, database_id);
         res.status(200).json({ id, ...balance });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// add manual supplier debt
+exports.addManualDebt = async (req, res, next) => {
+    try {
+        const { database_id } = req.user;
+        let data = req.body;
+        const result = await Supplier.addManualDebt(database_id, data);
+        res.status(201).send(result);
     } catch (error) {
         next(error);
     }

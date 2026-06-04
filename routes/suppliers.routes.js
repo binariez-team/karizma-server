@@ -3,6 +3,8 @@ const router = express.Router();
 
 const SuppliersController = require("../controllers/SuppliersController");
 
+router.post("/debts", SuppliersController.addManualDebt);
+
 //admin routes
 router.get("/", SuppliersController.getAllSuppliers);
 router.get("/:id", SuppliersController.getSupplierById);
@@ -11,8 +13,8 @@ router.put("/:id", SuppliersController.updateSupplier);
 router.delete("/:id", SuppliersController.deleteSupplier);
 
 router.get(
-	"/transactions/:account_id&:start&:end",
-	SuppliersController.getSupplierBalance
+    "/transactions/:account_id&:start&:end",
+    SuppliersController.getSupplierBalance,
 );
 
 router.get("/:id/balance", SuppliersController.getSupplierTotalBalance);
