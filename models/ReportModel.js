@@ -187,18 +187,20 @@ class ReportModel {
         const end_date = moment(endDate).tz("Asia/Beirut").format("YYYY-MM-DD");
 
         const [cashAccount] = await Accounts.getIdByAccountNumber("531");
+        const [whishAccount] = await Accounts.getIdByAccountNumber("532");
         const query = `SELECT
         COALESCE(sum(debit) - sum(credit),0) AS balance
         FROM journal_items ji
         where ji.is_deleted = 0
         AND DATE(ji.journal_date) BETWEEN ? AND ?
         AND ji.database_id = ?
-        AND ji.account_id_fk = ?`;
+        AND (ji.account_id_fk = ? OR ji.account_id_fk = ?)`;
         let [[result]] = await pool.query(query, [
             start_date,
             end_date,
             database_id,
             cashAccount.id,
+            whishAccount.id,
         ]);
         return result;
     }
