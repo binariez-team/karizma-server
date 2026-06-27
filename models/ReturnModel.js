@@ -10,12 +10,12 @@ class ReturnModel {
 
             moment.tz.setDefault("Asia/Beirut");
             order.order_datetime = moment(order.order_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
             // generate invoice_number
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 1000) + 1 AS number FROM return_orders`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number, 4) AS UNSIGNED)), 1000) + 1 AS number FROM return_orders`,
             );
             order.invoice_number = `RET${number.toString().padStart(4, "0")}`;
 
@@ -46,7 +46,7 @@ class ReturnModel {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                firstItem
+                firstItem,
             );
 
             let [_7011] = await Accounts.getIdByAccountNumber("7011");
@@ -63,7 +63,7 @@ class ReturnModel {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem
+                secondItem,
             );
 
             //add database_id to order
@@ -72,7 +72,7 @@ class ReturnModel {
             //insert order
             const [result] = await connection.query(
                 `INSERT INTO return_orders SET ?`,
-                order
+                order,
             );
             let order_id = result.insertId;
 
@@ -91,7 +91,7 @@ class ReturnModel {
             //insert order_items
             await connection.query(
                 `INSERT INTO return_order_items (order_id, product_id, quantity, unit_price, price_type, unit_cost, avg_cost, total_price) VALUES ?`,
-                [invoice_map]
+                [invoice_map],
             );
 
             // modify qty for stock managed items
@@ -113,11 +113,11 @@ class ReturnModel {
 
             if (payment) {
                 payment.payment_date = moment(payment.payment_date).format(
-                    `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                    `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
                 );
 
                 let [[{ number }]] = await connection.query(
-                    `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`
+                    `SELECT IFNULL(MAX(CAST(SUBSTRING(journal_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM journal_vouchers jv where journal_number like 'PAY%'`,
                 );
 
                 let payment_number = `PAY${number.toString().padStart(4, "0")}`;
@@ -142,13 +142,12 @@ class ReturnModel {
                     reference_number: payment.reference_number,
                     partner_id_fk: payment.customer_id,
 
-                    debit: 0,
-                    credit: payment.amount,
+                    debit: payment.amount,
                 };
 
                 await connection.query(
                     `INSERT INTO journal_items SET ?`,
-                    firstItem
+                    firstItem,
                 );
 
                 let [_413] = await Accounts.getIdByAccountNumber("413");
@@ -159,12 +158,11 @@ class ReturnModel {
                     reference_number: payment.reference_number,
                     partner_id_fk: null,
 
-                    debit: payment.amount,
-                    credit: 0,
+                    credit: payment.amount,
                 };
                 await connection.query(
                     `INSERT INTO journal_items SET ?`,
-                    secondItem
+                    secondItem,
                 );
             }
 
@@ -189,7 +187,7 @@ class ReturnModel {
             //check existing order for user
             let [[orderCheck]] = await connection.query(
                 `SELECT * FROM return_orders WHERE order_id = ? AND database_id = ?`,
-                [order_id, database_id]
+                [order_id, database_id],
             );
             if (!orderCheck) throw new Error("Order not found");
 
@@ -201,7 +199,7 @@ class ReturnModel {
             // add deleted items to inventory transactions
             await connection.query(
                 `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', quantity FROM return_order_items WHERE order_id = ?`,
-                [database_id, order_id]
+                [database_id, order_id],
             );
             //add order_items to inventory transactions
             items.forEach((element) => {
@@ -216,13 +214,13 @@ class ReturnModel {
             let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
             await connection.query(
                 deleteVoucherQuery,
-                orderCheck.journal_voucher_id
+                orderCheck.journal_voucher_id,
             );
 
             let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
             await connection.query(
                 deleteJournalItemsQuery,
-                orderCheck.journal_voucher_id
+                orderCheck.journal_voucher_id,
             );
 
             // delete old items
@@ -237,13 +235,13 @@ class ReturnModel {
 
             // fix date
             order.order_datetime = moment(order.order_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
 
             // fix invoice number
             order.invoice_number = `RET${order.invoice_number.padStart(
                 4,
-                "0"
+                "0",
             )}`;
 
             //insert transactions to new journal_items approch
@@ -273,7 +271,7 @@ class ReturnModel {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                firstItem
+                firstItem,
             );
 
             let [_7011] = await Accounts.getIdByAccountNumber("7011");
@@ -291,7 +289,7 @@ class ReturnModel {
 
             await connection.query(
                 `INSERT INTO journal_items SET ?`,
-                secondItem
+                secondItem,
             );
 
             //add database_id to order
@@ -300,7 +298,7 @@ class ReturnModel {
             // insert query
             const [result] = await connection.query(
                 `INSERT INTO return_orders SET ?`,
-                order
+                order,
             );
 
             let invoice_map = Array.from(items).map(function (item) {
@@ -318,7 +316,7 @@ class ReturnModel {
 
             const [new_order] = await connection.query(
                 `INSERT INTO return_order_items (order_id, product_id, quantity,  unit_price, price_type, unit_cost, avg_cost, total_price ) VALUES ?`,
-                [invoice_map]
+                [invoice_map],
             );
 
             await connection.commit();
@@ -339,27 +337,27 @@ class ReturnModel {
             let [[orderCheck]] = await connection.query(
                 `
 				SELECT * FROM return_orders WHERE order_id = ? AND database_id = ?`,
-                [order_id, database_id]
+                [order_id, database_id],
             );
             if (!orderCheck) throw new Error("Order not found");
 
             // add deleted items to inventory transactions
             await connection.query(
                 `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', quantity FROM return_order_items WHERE order_id = ?`,
-                [database_id, order_id]
+                [database_id, order_id],
             );
 
             //delete voucher and items
             let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
             await connection.query(
                 deleteVoucherQuery,
-                orderCheck.journal_voucher_id
+                orderCheck.journal_voucher_id,
             );
 
             let deleteJournalItemsQuery = `DELETE FROM journal_items WHERE journal_id_fk = ?`;
             await connection.query(
                 deleteJournalItemsQuery,
-                orderCheck.journal_voucher_id
+                orderCheck.journal_voucher_id,
             );
 
             // delete old items
