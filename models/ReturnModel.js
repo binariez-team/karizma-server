@@ -128,7 +128,7 @@ class ReturnModel {
                     database_id,
                     payment_number,
                     payment.payment_date,
-                    "Payment",
+                    "Payment Returned",
                     payment.amount,
                 ]);
 
@@ -140,9 +140,10 @@ class ReturnModel {
                     account_id_fk: _531.id,
                     database_id: database_id,
                     reference_number: payment.reference_number,
-                    partner_id_fk: payment.customer_id,
+                    partner_id_fk: null,
 
-                    debit: payment.amount,
+                    debit: 0,
+                    credit: payment.amount,
                 };
 
                 await connection.query(
@@ -156,9 +157,10 @@ class ReturnModel {
                     journal_date: payment.payment_date,
                     account_id_fk: _413.id,
                     reference_number: payment.reference_number,
-                    partner_id_fk: null,
-
-                    credit: payment.amount,
+                    partner_id_fk: payment.customer_id,
+                    database_id: database_id,
+                    debit: payment.amount,
+                    credit: 0,
                 };
                 await connection.query(
                     `INSERT INTO journal_items SET ?`,
