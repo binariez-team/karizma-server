@@ -330,6 +330,27 @@ class ReturnModel {
             connection.release();
         }
     }
+    // fetch a single return order shaped like a sell invoice (for the result dialog)
+    static async getAddedOrderById(order_id, database_id) {
+        const [[order]] = await pool.query(
+            `SELECT
+                A.name AS customer_name,
+                A.phone AS customer_phone,
+                A.address AS customer_address,
+                RO.*,
+                DATE(RO.order_datetime) AS order_date,
+                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
+            FROM return_orders RO
+            INNER JOIN return_order_items M ON RO.order_id = M.order_id
+            INNER JOIN products S ON S.product_id = M.product_id
+            INNER JOIN accounts  A ON RO.customer_id = A.account_id
+            WHERE RO.is_deleted = 0 AND RO.order_id = ? AND RO.database_id = ?
+            GROUP BY RO.order_id`,
+            [order_id, database_id],
+        );
+        return order;
+    }
+
     static async deleteReturn(database_id, order_id) {
         const connection = await pool.getConnection();
         try {

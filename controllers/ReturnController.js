@@ -14,7 +14,11 @@ exports.addReturn = async (req, res, next) => {
             items,
             payment
         );
-        res.status(201).json(result);
+        const new_order = await ReturnModel.getAddedOrderById(
+            result.order,
+            database_id
+        );
+        res.status(201).json(new_order);
     } catch (error) {
         next(error);
     }

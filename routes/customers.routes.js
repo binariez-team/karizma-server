@@ -14,19 +14,19 @@ router.get("/:account_id", CustomersController.getCustomerByIdAndUserId);
 router.post("/", CustomersController.createUserCustomer);
 router.put("/", CustomersController.updateUserCustomer);
 router.delete(
-	"/:account_id",
+    "/:account_id",
 
-	CustomersController.deleteUserCustomer
+    CustomersController.deleteUserCustomer,
 );
 
 router.get(
-	"/transactions/:account_id&:start&:end",
-	CustomersController.getCustomerBalance
+    "/transactions/:account_id&:start&:end",
+    CustomersController.getCustomerBalance,
 );
 
 router.get(
-	"/:account_id/purchases/latest",
-	CustomersController.getCustomerLatestPurchases
+    "/:account_id/purchases/latest",
+    CustomersController.getCustomerLatestPurchases,
 );
 router.get("/:account_id/balance", CustomersController.getCustomerTotalBalance);
 
