@@ -14,6 +14,8 @@ class UserProduct {
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
+					I.low_stock_threshold,
+					I.show_on_sell_page,
 					COALESCE(t.quantity, 0) AS quantity
 				FROM products P
 				INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.database_id = ?
@@ -57,6 +59,8 @@ class UserProduct {
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
+					I.low_stock_threshold,
+					I.show_on_sell_page,
 					COALESCE(t.quantity, 0) AS quantity
 				FROM products P
 				INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.database_id = ?
@@ -96,16 +100,29 @@ class UserProduct {
         const query = `UPDATE inventory
             SET grandwhole_price_usd = ?,
             whole_price_usd = ?,
-            unit_price_usd = ?
+            unit_price_usd = ?,
+            low_stock_threshold = ?,
+            show_on_sell_page = ?
             WHERE product_id_fk = ? AND database_id = ?;`;
 
         await pool.query(query, [
             prices.grandwhole_price_usd,
             prices.whole_price_usd,
             prices.unit_price_usd,
+            prices.low_stock_threshold ?? null,
+            prices.show_on_sell_page ? 1 : 0,
             product_id,
             database_id,
         ]);
+    }
+
+    // bulk update sell-page visibility for the current database_id
+    static async updateVisibility(database_id, productIds, show) {
+        if (!productIds || !productIds.length) return;
+        await pool.query(
+            `UPDATE inventory SET show_on_sell_page = ? WHERE product_id_fk IN (?) AND database_id = ?`,
+            [show ? 1 : 0, productIds, database_id]
+        );
     }
 
     // dispose

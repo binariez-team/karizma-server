@@ -1,5 +1,10 @@
 const pool = require("../config/database");
 
+// Migration (run manually):
+// ALTER TABLE inventory ADD COLUMN low_stock_threshold INT(11) DEFAULT NULL AFTER unit_price_usd;
+// ALTER TABLE inventory ADD COLUMN show_on_sell_page TINYINT(1) NOT NULL DEFAULT 1 AFTER low_stock_threshold;
+// low_stock_threshold and show_on_sell_page are stored per database_id (one inventory row per product per database_id, like prices).
+
 class Product {
     // get all products
     static async getAll(user) {
@@ -18,6 +23,8 @@ class Product {
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
+					I.low_stock_threshold,
+					I.show_on_sell_page,
 					COALESCE(t.quantity, 0) AS quantity
 				FROM products P
 				INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.database_id = ?
@@ -64,6 +71,8 @@ class Product {
 					I.grandwhole_price_usd,
 					I.whole_price_usd,
 					I.unit_price_usd,
+					I.low_stock_threshold,
+					I.show_on_sell_page,
 					COALESCE(t.quantity, 0) AS quantity
 				FROM products P
 				INNER JOIN inventory I ON P.product_id = I.product_id_fk  AND I.database_id = ?
@@ -134,6 +143,8 @@ class Product {
                 grandwhole_price_usd: data.grandwhole_price_usd,
                 whole_price_usd: data.whole_price_usd,
                 unit_price_usd: data.unit_price_usd,
+                low_stock_threshold: data.low_stock_threshold ?? null,
+                show_on_sell_page: data.show_on_sell_page == null ? 1 : data.show_on_sell_page ? 1 : 0,
             };
             await connection.query(`INSERT INTO inventory SET ?`, inventory);
 
@@ -177,6 +188,8 @@ class Product {
                 grandwhole_price_usd: data.grandwhole_price_usd,
                 whole_price_usd: data.whole_price_usd,
                 unit_price_usd: data.unit_price_usd,
+                low_stock_threshold: data.low_stock_threshold ?? null,
+                show_on_sell_page: data.show_on_sell_page ? 1 : 0,
             };
 
             if (data.change_avg_cost) {
@@ -196,6 +209,15 @@ class Product {
         } finally {
             connection.release();
         }
+    }
+
+    // bulk update sell-page visibility for the current database_id
+    static async updateVisibility(user, productIds, show) {
+        if (!productIds || !productIds.length) return;
+        await pool.query(
+            `UPDATE inventory SET show_on_sell_page = ? WHERE product_id_fk IN (?) AND database_id = ?`,
+            [show ? 1 : 0, productIds, user.database_id]
+        );
     }
 
     // delete product

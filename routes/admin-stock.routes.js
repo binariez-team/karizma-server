@@ -7,6 +7,7 @@ const BrandController = require("../controllers/BrandController");
 
 router.get("/items", AdminStockController.getAllProducts);
 router.post("/items", AdminStockController.createProduct);
+router.patch("/items/visibility", AdminStockController.updateVisibility);
 router.put("/items", AdminStockController.updateProduct);
 router.delete("/items/:id", AdminStockController.deleteProduct);
 

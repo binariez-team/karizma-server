@@ -48,6 +48,19 @@ exports.updateProduct = async (req, res, next) => {
     }
 };
 
+exports.updateVisibility = async (req, res, next) => {
+    const io = req.io;
+    const user = req.user;
+    const { product_ids, show_on_sell_page } = req.body;
+    try {
+        await Product.updateVisibility(user, product_ids, show_on_sell_page);
+        io.emit("productUpdated");
+        res.status(200).json({ message: "Visibility updated successfully!" });
+    } catch (error) {
+        next(error);
+    }
+};
+
 exports.deleteProduct = async (req, res, next) => {
     const product_id = req.params.id;
     try {

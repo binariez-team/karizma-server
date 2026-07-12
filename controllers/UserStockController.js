@@ -38,6 +38,21 @@ exports.updateProduct = async (req, res, next) => {
     }
 };
 
+exports.updateVisibility = async (req, res, next) => {
+    try {
+        const { database_id } = req.user;
+        const { product_ids, show_on_sell_page } = req.body;
+        await UserProduct.updateVisibility(
+            database_id,
+            product_ids,
+            show_on_sell_page
+        );
+        res.status(200).json({ message: "Visibility updated successfully!" });
+    } catch (err) {
+        next(err);
+    }
+};
+
 exports.disposeProducts = async (req, res, next) => {
     try {
         const { database_id } = req.user;
