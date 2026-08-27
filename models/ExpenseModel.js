@@ -187,6 +187,27 @@ class Expense {
         try {
             await connection.beginTransaction();
 
+            // Prove the voucher exists and belongs to this tenant before deleting
+            // anything, and report the outcome so the caller can distinguish a real
+            // delete from a no-op. Both statements below are tenant-scoped, so a
+            // cross-tenant id would silently remove nothing and still look successful.
+            // `journal_number LIKE 'EXP%'` is the guard that keeps this endpoint to
+            // expenses. Vouchers share one table and one id space, so without it a
+            // DELETE /expense/:journal_id would happily hard-delete an invoice, payment
+            // or transfer voucher and every journal item under it — and the list query
+            // above only applies the EXP filter when no search term is supplied, so a
+            // non-expense voucher can genuinely reach this screen.
+            const [[voucher]] = await connection.query(
+                `SELECT journal_id FROM journal_vouchers
+                WHERE journal_id = ? AND database_id = ?
+                  AND journal_number LIKE 'EXP%'`,
+                [journal_id, database_id],
+            );
+            if (!voucher) {
+                await connection.rollback();
+                return { deleted: 0 };
+            }
+
             await connection.query(
                 `DELETE FROM journal_items WHERE journal_id_fk = ? AND database_id = ?`,
                 [journal_id, database_id],
@@ -198,6 +219,7 @@ class Expense {
             );
 
             await connection.commit();
+            return { deleted: 1, journal_id: Number(journal_id) };
         } catch (error) {
             await connection.rollback();
             throw error;
