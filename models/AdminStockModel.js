@@ -1,6 +1,11 @@
 const pool = require("../config/database");
 
 // Migration (run manually):
+// ALTER TABLE inventory_transactions MODIFY transaction_type ENUM('SALE','SUPPLY','RETURN',
+//   'DELETE','DISPOSE','DELIVER','REVERSERETURN','REVERSEDISPOSE','REVERSEDELIVER','ADD',
+//   'REMOVE','REVALUE') CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;
+// 'REVALUE' records a manual override of avg_cost_usd (see update() below). Rows are
+// written with quantity = 0 so they move no stock and every existing reader ignores them.
 // ALTER TABLE inventory ADD COLUMN low_stock_threshold INT(11) DEFAULT NULL AFTER unit_price_usd;
 // ALTER TABLE inventory ADD COLUMN show_on_sell_page TINYINT(1) NOT NULL DEFAULT 1 AFTER low_stock_threshold;
 // low_stock_threshold and show_on_sell_page are stored per database_id (one inventory row per product per database_id, like prices).
@@ -192,7 +197,22 @@ class Product {
                 show_on_sell_page: data.show_on_sell_page ? 1 : 0,
             };
 
+            // Overriding the weighted average by hand discards a number the system
+            // otherwise derives from purchases, receipts, sales and their reversals, and
+            // it is the only write that can do so. Capture what it replaced BEFORE the
+            // update so the change can be audited — nothing else records it, and
+            // avg_cost_usd keeps no history.
+            let previousAvgCost = null;
             if (data.change_avg_cost) {
+                const [[current]] = await connection.query(
+                    `SELECT avg_cost_usd FROM inventory
+					WHERE product_id_fk = ? AND database_id = ? AND is_deleted = 0
+					FOR UPDATE`,
+                    [data.product_id, user.database_id]
+                );
+                previousAvgCost = current
+                    ? Number(current.avg_cost_usd)
+                    : null;
                 inventory.avg_cost_usd = data.unit_cost_usd;
             }
 
@@ -200,6 +220,31 @@ class Product {
                 `UPDATE inventory SET ? WHERE product_id_fk = ? AND database_id = ?`,
                 [inventory, data.product_id, user.database_id]
             );
+
+            // Record the revaluation in the ledger, where the rest of the cost history
+            // lives. quantity = 0 so it moves no stock: every reader sums `quantity`, and
+            // the ones that whitelist transaction types simply ignore an unlisted type,
+            // so this row is inert either way.
+            if (data.change_avg_cost) {
+                const newAvgCost = Number(data.unit_cost_usd) || 0;
+                // Only when it actually moved — saving the form without changing the cost
+                // should not litter the ledger.
+                if (
+                    previousAvgCost !== null &&
+                    Math.abs(previousAvgCost - newAvgCost) >= 0.005
+                ) {
+                    await connection.query(
+                        `INSERT INTO inventory_transactions
+						(product_id_fk, database_id, transaction_type, quantity, transaction_notes)
+						VALUES (?, ?, 'REVALUE', 0, ?)`,
+                        [
+                            data.product_id,
+                            user.database_id,
+                            `avg_cost ${previousAvgCost.toFixed(2)} -> ${newAvgCost.toFixed(2)} by ${user.username ?? "?"} (user_id ${user.user_id ?? "?"})`,
+                        ]
+                    );
+                }
+            }
 
             // commit transaction
             await connection.commit();

@@ -42,13 +42,17 @@ exports.fetchPendingInvoices = async (req, res, next) => {
 exports.approvePendingInvoice = async (req, res, next) => {
     try {
         const io = req.io;
-        const { id, database_id, admin_id } = req.body;
+        const { id } = req.body;
 
-        let result = await UserHistory.approvePendingInvoice(
-            id,
-            database_id,
-            admin_id
-        );
+        // The receiving tenant comes from the caller's token, never the request body.
+        // database_id and admin_id used to be taken straight from req.body and were
+        // never checked against the order, so any authenticated caller could approve
+        // somebody else's pending delivery into their own pool — stock, weighted-average
+        // cost merge and all — with the opening cost basis read from a database they do
+        // not own. The sending tenant is now derived from the order itself.
+        const { database_id } = req.user;
+
+        let result = await UserHistory.approvePendingInvoice(id, database_id);
 
         if (result.status) {
             if (result.status === "error") {

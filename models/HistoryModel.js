@@ -216,7 +216,7 @@ class History {
                 A.address AS customer_address,
                 RO.*,
                 DATE(RO.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
+                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'avg_cost', M.avg_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
             FROM return_orders RO
             INNER JOIN return_order_items M ON RO.order_id = M.order_id
             INNER JOIN products S ON S.product_id = M.product_id

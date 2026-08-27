@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const moment = require("moment-timezone");
+const InventoryCosting = require("./InventoryCosting");
 
 class UserProduct {
     static async getAll(database_id) {
@@ -121,7 +122,7 @@ class UserProduct {
         if (!productIds || !productIds.length) return;
         await pool.query(
             `UPDATE inventory SET show_on_sell_page = ? WHERE product_id_fk IN (?) AND database_id = ?`,
-            [show ? 1 : 0, productIds, database_id]
+            [show ? 1 : 0, productIds, database_id],
         );
     }
 
@@ -134,12 +135,12 @@ class UserProduct {
             await connection.beginTransaction();
 
             info.dispose_datetime = moment(info.dispose_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
             info.database_id = database_id;
 
             let [[{ number }]] = await connection.query(
-                `SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM dispose_products`
+                `SELECT IFNULL(MAX(CAST(SUBSTRING(invoice_number , 4) AS UNSIGNED)), 1000) + 1 AS number FROM dispose_products`,
             );
 
             info.invoice_number = `DIS${number.toString().padStart(4, "0")}`;
@@ -148,7 +149,7 @@ class UserProduct {
 
             const [result] = await connection.query(
                 `INSERT INTO dispose_products SET ?`,
-                info
+                info,
             );
             let dispose_items = products.map((product) => [
                 result.insertId,
@@ -159,7 +160,7 @@ class UserProduct {
 
             await connection.query(
                 `INSERT INTO dispose_products_items ( dispose_id, product_id, quantity, unit_cost ) VALUES ?`,
-                [dispose_items]
+                [dispose_items],
             );
 
             query = `INSERT INTO inventory_transactions (database_id, product_id_fk, transaction_type, transaction_datetime, quantity, order_id_fk)
@@ -196,26 +197,69 @@ class UserProduct {
             //check existing order for user
             let [[disposeCheck]] = await connection.query(
                 `
-				SELECT * FROM dispose_products WHERE dispose_id = ? AND database_id = ?`,
-                [info.dispose_id, database_id]
+				SELECT * FROM dispose_products WHERE dispose_id = ? AND database_id = ? AND is_deleted = 0`,
+                [info.dispose_id, database_id],
             );
             if (!disposeCheck) throw new Error("Order not found");
 
             //fix datetime
             info.dispose_datetime = moment(info.dispose_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`
+                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
+            );
+
+            // Put the ORIGINAL lines' value back at the cost they were written off at,
+            // before the REVERSEDISPOSE rows return their quantity below. Restoring at
+            // today's average instead would leak the drift since the dispose was made.
+            // The replacement lines are a fresh outflow and correctly leave the average
+            // alone.
+            const [oldLines] = await connection.query(
+                // is_deleted = 0: a soft-deleted line has already been written back
+                // and must not be restored a second time.
+                `SELECT product_id, quantity, unit_cost
+				FROM dispose_products_items WHERE dispose_id = ? AND is_deleted = 0`,
+                [info.dispose_id],
+            );
+            await InventoryCosting.restoreDisposedValue(
+                connection,
+                database_id,
+                oldLines,
             );
 
             //inventory_transactions
             await connection.query(
-                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSEDISPOSE', quantity FROM dispose_products_items WHERE dispose_id = ?`,
-                [database_id, info.dispose_id]
+                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSEDISPOSE', quantity FROM dispose_products_items WHERE dispose_id = ? AND is_deleted = 0`,
+                [database_id, info.dispose_id],
             );
 
             let query = `DELETE FROM dispose_products_items WHERE dispose_id = ?;`;
             await connection.query(query, [info.dispose_id]);
 
             /////////////////add new dispose//////////////
+
+            // Re-stamp every replacement line with the average as it stands NOW, not the
+            // figure the client captured when it opened the dialog. The restore above
+            // already moved the pool, so the client's number is stale: the outflow below
+            // relieves value at the current average, and storing anything else would make
+            // the recorded loss disagree with the value actually removed — and would make
+            // a later delete restore the wrong amount.
+            const currentAvg = await InventoryCosting.currentAverages(
+                connection,
+                database_id,
+                products.map((p) => p.product_id),
+            );
+            const costOf = (product) => {
+                const server = currentAvg.get(product.product_id) || 0;
+                return server > 0 ? server : product.unit_cost;
+            };
+
+            // The header total drives the loss report (ReportModel.getDisposes), so it has
+            // to be rebuilt from the same costs, or the report and the lines disagree.
+            info.total_cost = products.reduce(
+                (sum, product) =>
+                    sum +
+                    (Number(product.quantity) || 0) * Number(costOf(product)),
+                0,
+            );
 
             query = `UPDATE dispose_products SET ? WHERE dispose_id = ?;`;
             await connection.query(query, [info, info.dispose_id]);
@@ -224,23 +268,33 @@ class UserProduct {
                 info.dispose_id,
                 product.product_id,
                 product.quantity,
-                product.unit_cost,
+                costOf(product),
             ]);
 
             await connection.query(
                 `INSERT INTO dispose_products_items ( dispose_id, product_id, quantity, unit_cost ) VALUES ?`,
-                [dispose_items]
+                [dispose_items],
             );
 
-            query = `INSERT INTO inventory_transactions (database_id, product_id_fk, transaction_type, transaction_datetime, quantity)
+            // order_id_fk is required: both delete paths remove DISPOSE rows by
+            // `order_id_fk = dispose_id` (UserStockModel.deleteDispose and
+            // Dispose.model.delete), so a replacement row written without it can never
+            // be reversed — the delete matches nothing and the stock stays out
+            // permanently while the value is restored.
+            query = `INSERT INTO inventory_transactions (database_id, product_id_fk, transaction_type, transaction_datetime, quantity, order_id_fk)
 			VALUES ?;`;
 
+            // DISPOSE takes stock out, so the quantity is stored negative — same as
+            // addDispose above and Dispose.model.js:109. Readers sum `quantity` as
+            // stored and never flip the sign, so a positive row here turns an edited
+            // dispose into a stock increase of +q instead of a decrease of -q.
             const values = products.map((product) => [
                 database_id,
                 product.product_id,
                 "DISPOSE",
                 info.dispose_datetime,
-                product.quantity,
+                -product.quantity,
+                info.dispose_id,
             ]);
 
             await connection.query(query, [values]);
@@ -264,10 +318,25 @@ class UserProduct {
             //check existing order for user
             let [[disposeCheck]] = await connection.query(
                 `
-				SELECT * FROM dispose_products WHERE dispose_id = ? AND database_id = ?`,
-                [dispose_id, database_id]
+				SELECT * FROM dispose_products WHERE dispose_id = ? AND database_id = ? AND is_deleted = 0`,
+                [dispose_id, database_id],
             );
             if (!disposeCheck) throw new Error("Order not found");
+
+            // Put the written-off value back at the cost it was written off at, before
+            // the DISPOSE rows are removed below and return the quantity.
+            const [oldLines] = await connection.query(
+                // is_deleted = 0: a soft-deleted line has already been written back
+                // and must not be restored a second time.
+                `SELECT product_id, quantity, unit_cost
+				FROM dispose_products_items WHERE dispose_id = ? AND is_deleted = 0`,
+                [dispose_id],
+            );
+            await InventoryCosting.restoreDisposedValue(
+                connection,
+                database_id,
+                oldLines,
+            );
 
             let query = `UPDATE dispose_products_items SET is_deleted = 1 WHERE dispose_id = ?;`;
             await connection.query(query, [dispose_id]);
@@ -275,9 +344,11 @@ class UserProduct {
             query = `UPDATE dispose_products SET is_deleted = 1 WHERE dispose_id = ?;`;
             await connection.query(query, [dispose_id]);
 
+            // database_id keeps the delete inside this tenant — dispose_id is not
+            // tenant-scoped, so without it this could remove another tenant's rows.
             await connection.query(
-                `DELETE FROM inventory_transactions WHERE transaction_type = 'DISPOSE' AND order_id_fk = ?`,
-                [dispose_id]
+                `DELETE FROM inventory_transactions WHERE transaction_type = 'DISPOSE' AND order_id_fk = ? AND database_id = ?`,
+                [dispose_id, database_id],
             );
 
             await connection.commit();

@@ -51,8 +51,12 @@ exports.editOrder = async (req, res, next) => {
 exports.deleteOrder = async (req, res, next) => {
     try {
         const order_id = req.params.id;
-        await PurchaseOrders.deleteOrder(order_id);
-        res.status(200).json({ message: "Order deleted successfully" });
+        const { database_id } = req.user;
+        const result = await PurchaseOrders.deleteOrder(order_id, database_id);
+        res.status(200).json({
+            message: "Order deleted successfully",
+            cost_reversal: result,
+        });
     } catch (error) {
         next(error);
     }

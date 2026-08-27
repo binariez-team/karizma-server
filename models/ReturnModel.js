@@ -3,6 +3,93 @@ const moment = require("moment-timezone");
 const Accounts = require("./AccountsModel");
 
 class ReturnModel {
+    /**
+     * Move the value of returned goods into or out of the weighted average.
+     *
+     * `direction` is +1 when goods come back from the customer (a RETURN) and -1 when
+     * that return is undone (a REVERSERETURN, on edit or delete). Value in and value
+     * out use the same per-line cost, so a return is reversible without leaking even
+     * if the pool's average has moved in between — which it has on 44% of the return
+     * lines currently in the database.
+     *
+     * Must be called BEFORE the matching inventory_transactions rows are written: the
+     * blend has to see the quantity on hand without the units being moved.
+     *
+     * `lines` need `product_id`, `quantity` and `avg_cost` (falling back to
+     * `unit_cost`, exactly as ReportModel.getReturns:76 does when it prices a return).
+     */
+    static async applyReturnCost(connection, database_id, lines, direction) {
+        // one product can appear on two lines of the same return — blend it once
+        const perProduct = new Map();
+        for (const line of lines) {
+            const qty = Number(line.quantity) || 0;
+            const cost =
+                Number(line.avg_cost) || Number(line.unit_cost) || 0;
+            if (!(qty > 0) || !(cost > 0)) continue;
+            const acc = perProduct.get(line.product_id) || { qty: 0, value: 0 };
+            acc.qty += qty;
+            acc.value += qty * cost;
+            perProduct.set(line.product_id, acc);
+        }
+
+        // ascending product order keeps the lock order deterministic and matching the
+        // other cost paths, so they cannot deadlock against each other
+        for (const product_id of [...perProduct.keys()].sort((a, b) => a - b)) {
+            const { qty, value } = perProduct.get(product_id);
+
+            const [[inventoryRow]] = await connection.query(
+                `SELECT avg_cost_usd FROM inventory
+				WHERE product_id_fk = ? AND database_id = ? AND is_deleted = 0
+				FOR UPDATE`,
+                [product_id, database_id],
+            );
+            if (!inventoryRow) continue;
+
+            const [[qtyRow]] = await connection.query(
+                `SELECT COALESCE(SUM(quantity), 0) AS quantity
+				FROM inventory_transactions
+				WHERE product_id_fk = ? AND database_id = ? AND is_deleted = 0`,
+                [product_id, database_id],
+            );
+
+            // mysql2 returns DECIMAL and SUM() over INT as strings — coerce first.
+            const currentAvgCost = Number(inventoryRow.avg_cost_usd) || 0;
+            // Sales are not stock-checked, so on-hand can be negative; clamp before it
+            // reaches the divisor.
+            const currentQty = Math.max(Number(qtyRow.quantity), 0);
+
+            const newQty = currentQty + direction * qty;
+            const newValue = currentQty * currentAvgCost + direction * value;
+
+            // Nothing left to carry an average (the reversal empties or oversells the
+            // pool), or the pool is worth less than what is being taken out: leave the
+            // average alone rather than storing a negative or a zero. Zero is not
+            // neutral — PurchaseModel:123 reads a 0.00 average as "never calculated".
+            if (!(newQty > 0) || !(newValue > 0)) continue;
+
+            const newAvgCost =
+                currentQty === 0 || currentAvgCost === 0
+                    ? value / qty
+                    : newValue / newQty;
+
+            // Round to the stored scale before the range check — avg_cost_usd is
+            // DECIMAL(10,2), so the guard should see the value that actually lands.
+            const rounded = Math.round(newAvgCost * 100) / 100;
+            if (
+                !Number.isFinite(rounded) ||
+                rounded < 0.01 ||
+                rounded > 99999999.99
+            )
+                continue;
+
+            await connection.query(
+                `UPDATE inventory SET avg_cost_usd = ?
+				WHERE product_id_fk = ? AND database_id = ? AND is_deleted = 0`,
+                [rounded, product_id, database_id],
+            );
+        }
+    }
+
     static async addReturn(database_id, order, items, payment) {
         const connection = await pool.getConnection();
         try {
@@ -93,6 +180,24 @@ class ReturnModel {
                 `INSERT INTO return_order_items (order_id, product_id, quantity, unit_price, price_type, unit_cost, avg_cost, total_price) VALUES ?`,
                 [invoice_map],
             );
+
+            // ##############################################################################################
+            // ####################### blend the returned goods back into the pool ##########################
+            // Returned units are an inflow and have to be valued. Because inventory holds no
+            // value column — stock value is derived as SUM(inventory_transactions.quantity) *
+            // avg_cost_usd — simply adding quantity already books the units in at TODAY's
+            // average. That is only right when the line's recorded avg_cost happens to equal
+            // today's average, so blend explicitly at the recorded cost instead: it is the same
+            // number ReportModel.getReturns:76 publishes as the cost of the return, and the two
+            // must agree or the stock value and the P&L describe different events.
+            //
+            // Doing it explicitly is also what makes the return REVERSIBLE: editReturn and
+            // deleteReturn now remove exactly this value back out, so an edit or a delete after
+            // the average has moved no longer leaks.
+            //
+            // Read before the RETURN rows are inserted below, so the blend runs against the
+            // quantity on hand WITHOUT the returned units.
+            await ReturnModel.applyReturnCost(connection, database_id, items, 1);
 
             // modify qty for stock managed items
 
@@ -198,11 +303,36 @@ class ReturnModel {
             let product_id = null;
             let quantity = null;
 
+            // Take the ORIGINAL lines' value back out at the cost they came in at, before
+            // anything is deleted or re-inserted. Reversing at today's average instead
+            // would leak quantity * (today_avg - recorded_cost) on every edit — 44% of
+            // live return lines already sit on a moved average.
+            const [oldLines] = await connection.query(
+                `SELECT product_id, quantity, avg_cost, unit_cost
+				FROM return_order_items WHERE order_id = ?`,
+                [order_id],
+            );
+            await ReturnModel.applyReturnCost(
+                connection,
+                database_id,
+                oldLines,
+                -1,
+            );
+
             // add deleted items to inventory transactions
+            // REVERSERETURN cancels a RETURN, so it must carry the opposite sign.
+            // Every reader sums `quantity` as stored (AdminStockModel.js:44,
+            // UserStockModel.js:35, ReportModel.js:19) — none of them flip the sign,
+            // so a positive row here would add the returned stock a second time.
             await connection.query(
-                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', quantity FROM return_order_items WHERE order_id = ?`,
+                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', -quantity FROM return_order_items WHERE order_id = ?`,
                 [database_id, order_id],
             );
+            // ...then blend the replacement lines in, at their own recorded cost. Reading
+            // on-hand here sees the REVERSERETURN rows above already applied, which is
+            // correct: the old lines are gone by this point.
+            await ReturnModel.applyReturnCost(connection, database_id, items, 1);
+
             //add order_items to inventory transactions
             items.forEach((element) => {
                 product_id = element.product_id;
@@ -364,9 +494,26 @@ class ReturnModel {
             );
             if (!orderCheck) throw new Error("Order not found");
 
+            // Take the return's value back out at the cost it was booked in at, before
+            // the reversing rows land and before the line rows are deleted below.
+            // Reversing at today's average would leak the drift instead.
+            const [oldLines] = await connection.query(
+                `SELECT product_id, quantity, avg_cost, unit_cost
+				FROM return_order_items WHERE order_id = ?`,
+                [order_id],
+            );
+            await ReturnModel.applyReturnCost(
+                connection,
+                database_id,
+                oldLines,
+                -1,
+            );
+
             // add deleted items to inventory transactions
+            // REVERSERETURN cancels a RETURN, so it must carry the opposite sign —
+            // see the note on the same statement in editOrder above.
             await connection.query(
-                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', quantity FROM return_order_items WHERE order_id = ?`,
+                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) SELECT product_id, ?, 'REVERSERETURN', -quantity FROM return_order_items WHERE order_id = ?`,
                 [database_id, order_id],
             );
 

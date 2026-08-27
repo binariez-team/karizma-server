@@ -90,29 +90,46 @@ class UserHistory {
         return rows;
     }
 
-    static async approvePendingInvoice(id, database_id, admin_id) {
+    // `database_id` is the RECEIVING tenant and must come from the caller's token.
+    // The sending tenant (`admin_id`) is read off the order, never accepted from the
+    // caller — it selects whose inventory the opening cost basis is copied from.
+    static async approvePendingInvoice(id, database_id) {
         const connection = await pool.getConnection();
 
         try {
             await connection.beginTransaction();
 
-            // 1. Check if already approved
+            // 1. Load the order and prove it is addressed to this tenant.
+            // FOR UPDATE serialises concurrent approvals: the is_approved guard below
+            // is only meaningful if two callers cannot both read the row as pending and
+            // then both post the receipt.
             const [[check]] = await connection.query(
-                `SELECT is_approved FROM deliver_orders WHERE order_id = ?`,
+                `SELECT is_approved, is_deleted, database_id, admin_id_fk
+                FROM deliver_orders WHERE order_id = ? FOR UPDATE`,
                 [id],
             );
 
-            if (check?.is_approved === 1) {
+            // Same response for "does not exist" and "belongs to someone else", so the
+            // endpoint cannot be used to probe for other tenants' order ids.
+            if (!check || Number(check.database_id) !== Number(database_id)) {
+                await connection.rollback();
+                return { status: "error", message: "Order not found" };
+            }
+
+            const admin_id = check.admin_id_fk;
+
+            // Compare truthily, not against 1: config/database.js casts every
+            // TINYINT(1) to a JS boolean, so `is_approved === 1` is always false and
+            // this guard never fired — approval was re-runnable and re-posted the
+            // receipt (and its weighted-average cost merge) on every call.
+            if (check.is_approved) {
                 await connection.rollback();
                 return { status: "error", message: "Already approved!" };
             }
 
             // 1.1 Check if the order is deleted
-            const [[checkDeleted]] = await connection.query(
-                `SELECT is_deleted FROM deliver_orders WHERE order_id = ?`,
-                [id],
-            );
-            if (checkDeleted?.is_deleted === 1) {
+            // same TINYINT(1) -> boolean cast applies here
+            if (check.is_deleted) {
                 await connection.rollback();
                 return { status: "error", message: "Order is deleted!" };
             }
@@ -125,32 +142,37 @@ class UserHistory {
 
             // 3. Fetch invoice items
             const [items] = await connection.query(
-                `SELECT product_id, quantity, unit_price
+                `SELECT product_id, quantity, unit_price, avg_cost_usd
                 FROM deliver_order_items
                 WHERE order_id_fk = ? AND is_deleted = 0`,
                 [id],
             );
 
             for (const record of items) {
-                const incomingQty = record.quantity;
-                const incomingUnitCost = record.unit_price;
+                const incomingQty = Number(record.quantity);
 
-                if (incomingQty <= 0) continue;
+                if (!(incomingQty > 0)) continue;
 
-                // 4. Check inventory existence
-                const [[inventory]] = await connection.query(
-                    `SELECT avg_cost_usd
-                 FROM inventory
-                 WHERE product_id_fk = ?
-                   AND database_id = ?
-                   AND is_deleted = 0`,
-                    [record.product_id, database_id],
-                );
+                // 4. The sender's cost basis for this product.
+                // A transfer moves goods at the SENDER's cost, not at the price on the
+                // delivery note. That price is a reference/selling figure and may carry a
+                // margin; costing the receipt at it would book in more (or less) value
+                // than the sender relieved, and since deliveries write no journal entries
+                // there is nothing anywhere to absorb the difference. Using the sender's
+                // cost keeps a transfer value-neutral for the group, and it makes a
+                // delivery from user A at their cost of 10 blend into the receiver's pool
+                // distinctly from user C's at 12 — which is the point of the model.
+                //
+                // Prefer the cost SNAPSHOTTED at dispatch (DeliverModel.senderCostFor):
+                // approval can happen days later, and by then the sender may have bought
+                // more stock at a different price. The goods should be valued at what they
+                // cost when they left, not when the paperwork was signed.
+                const snapshotCost = Number(record.avg_cost_usd) || 0;
 
-                // 5. Create inventory if missing (copy from admin)
-                if (!inventory) {
-                    const [[adminInventory]] = await connection.query(
-                        `SELECT unit_cost_usd,
+                // Rows created before deliver_order_items.avg_cost_usd existed have no
+                // snapshot, so fall back to the sender's live average for those.
+                const [[senderInventory]] = await connection.query(
+                    `SELECT unit_cost_usd,
                             avg_cost_usd,
                             grandwhole_price_usd,
                             whole_price_usd,
@@ -159,23 +181,54 @@ class UserHistory {
                      WHERE database_id = ?
                        AND product_id_fk = ?
                        AND is_deleted = 0`,
-                        [admin_id, record.product_id],
-                    );
+                    [admin_id, record.product_id],
+                );
 
+                // mysql2 returns DECIMAL as a string, so '0.00' is truthy — `??` would
+                // let a zero-cost sender seed a zero-cost pool, which then reports 100%
+                // margin on every sale until something dilutes it. Fall back through the
+                // sender's last known cost to the delivery price rather than accept 0.
+                const senderAvg = Number(senderInventory?.avg_cost_usd) || 0;
+                const senderUnitCost =
+                    Number(senderInventory?.unit_cost_usd) || 0;
+                const incomingUnitCost =
+                    snapshotCost > 0
+                        ? snapshotCost
+                        : senderAvg > 0
+                          ? senderAvg
+                          : senderUnitCost > 0
+                            ? senderUnitCost
+                            : Number(record.unit_price) || 0;
+
+                // 5. Lock the receiver's row for the whole read-modify-write, so a
+                // concurrent receipt of the same product cannot discard this blend.
+                const [[inventory]] = await connection.query(
+                    `SELECT avg_cost_usd
+                 FROM inventory
+                 WHERE product_id_fk = ?
+                   AND database_id = ?
+                   AND is_deleted = 0
+                 FOR UPDATE`,
+                    [record.product_id, database_id],
+                );
+
+                // 5.1 Create inventory if missing — first receipt opens the pool at the
+                // sender's cost. Selling prices are seeded from the sender too; the user
+                // can change them afterwards.
+                if (!inventory) {
                     await connection.query(`INSERT INTO inventory SET ?`, {
                         product_id_fk: record.product_id,
                         database_id,
-                        unit_cost_usd:
-                            adminInventory?.unit_cost_usd ?? incomingUnitCost,
-                        avg_cost_usd:
-                            adminInventory?.avg_cost_usd ?? incomingUnitCost,
+                        unit_cost_usd: incomingUnitCost,
+                        avg_cost_usd: incomingUnitCost,
                         grandwhole_price_usd:
-                            adminInventory?.grandwhole_price_usd ?? 0,
-                        whole_price_usd: adminInventory?.whole_price_usd ?? 0,
-                        unit_price_usd: adminInventory?.unit_price_usd ?? 0,
+                            senderInventory?.grandwhole_price_usd ?? 0,
+                        whole_price_usd: senderInventory?.whole_price_usd ?? 0,
+                        unit_price_usd: senderInventory?.unit_price_usd ?? 0,
                     });
                 } else {
-                    // 6. Get current quantity BEFORE insert
+                    // 6. Get current quantity BEFORE the DELIVER row is inserted below,
+                    // or the incoming units would be counted on both sides of the blend.
                     const [[qtyRow]] = await connection.query(
                         `SELECT COALESCE(SUM(quantity), 0) AS quantity
                      FROM inventory_transactions
@@ -185,32 +238,30 @@ class UserHistory {
                         [record.product_id, database_id],
                     );
 
-                    const currentQty = Math.max(qtyRow.quantity, 0);
+                    const currentQty = Math.max(Number(qtyRow.quantity), 0);
+                    const currentAvgCost = Number(inventory.avg_cost_usd) || 0;
 
-                    // 7. Fetch current avg cost
-                    const [[costRow]] = await connection.query(
-                        `SELECT avg_cost_usd
-                     FROM inventory
-                     WHERE product_id_fk = ?
-                       AND database_id = ?
-                       AND is_deleted = 0`,
-                        [record.product_id, database_id],
-                    );
+                    // 7. Blend. No special case is needed for an empty pool: with
+                    // currentQty = 0 this reduces to exactly incomingUnitCost, and
+                    // incomingQty is guaranteed > 0 above, so the divisor is never 0.
+                    // An empty pool therefore reopens at the sender's cost, identical to
+                    // the first-receipt branch above.
+                    const newAvgCost =
+                        (currentQty * currentAvgCost +
+                            incomingQty * incomingUnitCost) /
+                        (currentQty + incomingQty);
 
-                    const currentAvgCost = costRow?.avg_cost_usd ?? 0;
+                    // Round to the stored scale before persisting — avg_cost_usd is
+                    // DECIMAL(10,2), and the guard should see the value that lands.
+                    const rounded = Math.round(newAvgCost * 100) / 100;
+                    if (
+                        !Number.isFinite(rounded) ||
+                        rounded < 0 ||
+                        rounded > 99999999.99
+                    )
+                        continue;
 
-                    // 8. Calculate NEW moving average cost
-                    let newAvgCost;
-
-                    if (currentQty === 0) {
-                        newAvgCost = incomingUnitCost;
-                    } else {
-                        newAvgCost =
-                            (currentQty * currentAvgCost +
-                                incomingQty * incomingUnitCost) /
-                            (currentQty + incomingQty);
-                    }
-                    // 9. Update inventory avg cost
+                    // 8. Update inventory avg cost
                     await connection.query(
                         `UPDATE inventory
                      SET avg_cost_usd = ?,
@@ -218,7 +269,7 @@ class UserHistory {
                      WHERE product_id_fk = ?
                        AND database_id = ?`,
                         [
-                            newAvgCost,
+                            rounded,
                             incomingUnitCost,
                             record.product_id,
                             database_id,

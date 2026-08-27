@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const moment = require("moment-timezone");
+const InventoryCosting = require("./InventoryCosting");
 moment.tz.setDefault("Asia/Beirut");
 
 class Dispose {
@@ -87,10 +88,36 @@ class Dispose {
 
             //check existing order for user
             let [[orderCheck]] = await connection.query(
-                `SELECT * FROM dispose_products WHERE dispose_id = ? AND database_id = ?`,
+                // is_deleted = 0 is what stops a double restore. /user-stock/dispose
+                // SOFT-deletes (UserStockModel.deleteDispose flags the header and items)
+                // while this route HARD-deletes, so without the filter a dispose already
+                // written back by one route is still visible to the other — and
+                // restoreDisposedValue would put its value back a second time, with no
+                // quantity movement to match.
+                `SELECT * FROM dispose_products
+				WHERE dispose_id = ? AND database_id = ? AND is_deleted = 0`,
                 [dispose_id, database_id],
             );
             if (!orderCheck) throw new Error("Dispose Order not found");
+
+            // Put the ORIGINAL lines' value back before their quantity returns, at the
+            // cost the dispose was booked at. Deleting the DISPOSE rows below returns the
+            // units but not their value, so without this the pool regains stock valued at
+            // today's average instead of what was written off — 51% of live dispose lines
+            // already sit on a moved average. The replacement lines below are a fresh
+            // outflow and correctly leave the average alone.
+            const [oldLines] = await connection.query(
+                // is_deleted = 0: a soft-deleted line has already been written back
+                // and must not be restored a second time.
+                `SELECT product_id, quantity, unit_cost
+				FROM dispose_products_items WHERE dispose_id = ? AND is_deleted = 0`,
+                [dispose_id],
+            );
+            await InventoryCosting.restoreDisposedValue(
+                connection,
+                database_id,
+                oldLines,
+            );
 
             // delete inventory records
             await connection.query(
@@ -136,6 +163,31 @@ class Dispose {
             // attach old disponse number
             info.invoice_number = orderCheck.invoice_number;
 
+            // Re-stamp every replacement line with the average as it stands NOW, not the
+            // figure the client captured when it opened the dialog. The restore above
+            // already moved the pool, so the client's number is stale: the outflow below
+            // relieves value at the current average, and storing anything else would make
+            // the recorded loss disagree with the value actually removed — and would make
+            // a later delete restore the wrong amount. Same treatment SellOrdersModel
+            // .editOrder applies to its own snapshots.
+            const currentAvg = await InventoryCosting.currentAverages(
+                connection,
+                database_id,
+                products.map((p) => p.product_id),
+            );
+            const costOf = (product) => {
+                const server = currentAvg.get(product.product_id) || 0;
+                return server > 0 ? server : product.unit_cost;
+            };
+
+            // The header total drives the loss report (ReportModel.getDisposes), so it has
+            // to be rebuilt from the same costs, or the report and the lines disagree.
+            info.total_cost = products.reduce(
+                (sum, product) =>
+                    sum + (Number(product.quantity) || 0) * Number(costOf(product)),
+                0,
+            );
+
             // insert created dispose
             const [result] = await connection.query(
                 `INSERT INTO dispose_products SET ?`,
@@ -147,7 +199,7 @@ class Dispose {
                 dispose_id,
                 product.product_id,
                 product.quantity,
-                product.unit_cost,
+                costOf(product),
             ]);
 
             // insert dispose items
@@ -175,6 +227,37 @@ class Dispose {
 
         try {
             await connection.beginTransaction();
+
+            // Prove the dispose belongs to this tenant before touching anything. The
+            // header delete below is tenant-scoped but the item delete is not, so without
+            // this a cross-tenant call would leave another tenant's dispose items and
+            // ledger rows in an inconsistent state — and would restore value into the
+            // wrong pool.
+            const [[orderCheck]] = await connection.query(
+                // is_deleted = 0 — see the note in update(). The two dispose routes
+                // disagree on soft vs hard delete, so an already-written-back dispose
+                // must not be restorable again through this one.
+                `SELECT dispose_id FROM dispose_products
+				WHERE dispose_id = ? AND database_id = ? AND is_deleted = 0`,
+                [dispose_id, database_id],
+            );
+            if (!orderCheck) throw new Error("Dispose Order not found");
+
+            // Put the written-off value back at the cost it was written off at, before
+            // the DISPOSE rows are removed below and return the quantity. Restoring at
+            // today's average instead would leak the drift since the dispose was made.
+            const [oldLines] = await connection.query(
+                // is_deleted = 0: a soft-deleted line has already been written back
+                // and must not be restored a second time.
+                `SELECT product_id, quantity, unit_cost
+				FROM dispose_products_items WHERE dispose_id = ? AND is_deleted = 0`,
+                [dispose_id],
+            );
+            await InventoryCosting.restoreDisposedValue(
+                connection,
+                database_id,
+                oldLines,
+            );
 
             // delete dispose
             await connection.query(
