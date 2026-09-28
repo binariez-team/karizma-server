@@ -28,7 +28,9 @@ class Staff {
 
     // update
     static async update(staff, database_id) {
-        const query = `UPDATE users SET ? WHERE user_id = ? AND database_id = ?`;
+        // user_type = 'staff': a user shares database_id with their staff, so without
+        // it the owner's own row is reachable through this route too.
+        const query = `UPDATE users SET ? WHERE user_id = ? AND database_id = ? AND user_type = 'staff'`;
         await pool.query(query, [staff, staff.user_id, database_id]);
     }
 

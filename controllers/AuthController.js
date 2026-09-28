@@ -39,6 +39,7 @@ exports.login = async (req, res, next) => {
                     view_cash: result.view_cash,
                     view_cost: result.view_cost,
                     transfer_money: result.transfer_money,
+                    edit_stock: result.edit_stock,
                 },
             };
             if (user.user_type !== "admin") {

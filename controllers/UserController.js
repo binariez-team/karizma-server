@@ -1,5 +1,12 @@
 const User = require("../models/UserModel");
 
+// users.edit_stock is TINYINT(1) NOT NULL DEFAULT 0. The dialog sends a boolean; a null
+// (e.g. from a client built before the toggle existed) would fail the write under
+// STRICT_TRANS_TABLES, so coerce whatever arrives to 0/1.
+const normalizePermissions = (user) => {
+    if ("edit_stock" in user) user.edit_stock = user.edit_stock ? 1 : 0;
+};
+
 // get users
 exports.getUsers = async (req, res, next) => {
     try {
@@ -20,8 +27,9 @@ exports.createUser = async (req, res, next) => {
             res.status(406).send({ message: "Username already exists" });
         } else {
             // create user
+            normalizePermissions(user);
             let result = await User.create(user);
-            let [createdUser] = await User.getById(result.insertId);
+            let [createdUser] = await User.getForAdmin(result.insertId);
             res.status(201).send(createdUser);
         }
     } catch (error) {
@@ -42,8 +50,19 @@ exports.updateUser = async (req, res, next) => {
         if (validateUser) {
             res.status(406).send({ message: "Username already exists" });
         } else {
+            // Take the tenant from the row, not the request. The dialog carries
+            // database_id as a hidden form value; a stale one would move this user
+            // into another tenant, and User.update would rename that tenant's
+            // database to this username.
+            const [existing] = await User.getForAdmin(user.user_id);
+            if (!existing) {
+                return res.status(404).send({ message: "User not found" });
+            }
+            user.database_id = existing.database_id;
+
+            normalizePermissions(user);
             await User.update(user);
-            const [updatedUser] = await User.getById(user.user_id);
+            const [updatedUser] = await User.getForAdmin(user.user_id);
             res.status(201).send(updatedUser);
         }
     } catch (error) {

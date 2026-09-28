@@ -4,6 +4,7 @@ const moment = require("moment-timezone");
 class AdminHistory {
     // fetch deliver invoices for admin
     static async fetchDeliverHistory(criteria, database_id) {
+        console.log(criteria);
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
@@ -19,9 +20,9 @@ class AdminHistory {
             sql += ` AND O.invoice_number LIKE ?`;
             params.push(`%${criteria.invoice_number}%`);
         }
-        if (criteria.database_id) {
+        if (criteria.user_id) {
             sql += ` AND O.database_id = ?`;
-            params.push(criteria.database_id);
+            params.push(criteria.user_id);
         }
         if (criteria.start_date) {
             sql += ` AND DATE(order_datetime) >= ?`;

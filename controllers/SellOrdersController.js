@@ -1,4 +1,17 @@
 const SellOrders = require("../models/SellOrdersModel");
+
+// Every line of a sale must move a positive quantity. The model
+// books `-quantity` as the SALE stock movement, so a negative line (e.g. a "-2*CODE"
+// scan) would ADD stock and post a negative total; a zero line books nothing but
+// still shows on the invoice. The clients block both — this is the server's own check.
+const invalidQuantity = (items) =>
+    Array.isArray(items) &&
+    items.some((item) => {
+        const qty = Number(item?.quantity);
+        // whole units: the quantity columns are INT, so 0.4 would be stored as 0
+        // while the line total is still computed from 0.4
+        return !Number.isInteger(qty) || qty < 1;
+    });
 exports.addOrder = async (req, res, next) => {
     try {
         const { database_id } = req.user;
@@ -6,6 +19,11 @@ exports.addOrder = async (req, res, next) => {
         const payment = req.body.payment;
         const items = order.items;
         delete order.items;
+        if (invalidQuantity(items)) {
+            return res
+                .status(400)
+                .send({ message: "Every item needs a whole quantity of 1 or more" });
+        }
 
         order.database_id = database_id;
 
@@ -33,6 +51,11 @@ exports.editOrder = async (req, res, next) => {
         const payment = req.body.payment ?? null;
         const items = order.items;
         delete order.items;
+        if (invalidQuantity(items)) {
+            return res
+                .status(400)
+                .send({ message: "Every item needs a whole quantity of 1 or more" });
+        }
         const { database_id } = req.user;
 
         const order_id = await SellOrders.editOrder(

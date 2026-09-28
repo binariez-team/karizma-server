@@ -77,9 +77,29 @@ exports.addStockCorrection = async (req, res, next) => {
     try {
         // const io = req.io;
         const user = req.user;
-        const data = req.body;
 
-        data.database_id = user.database_id;
+        // Build the ledger row from known fields only — updateStock INSERTs it with
+        // `SET ?`, so passing req.body through would let a caller pick any
+        // transaction_type (SUPPLY, SALE, ...) or attach the row to another document's
+        // order_id_fk. This endpoint is reachable by users with edit_stock, not just
+        // admins.
+        const { product_id_fk, transaction_type, transaction_notes } = req.body;
+        const quantity = Number(req.body.quantity);
+        if (
+            !product_id_fk ||
+            !["ADD", "REMOVE"].includes(transaction_type) ||
+            !(quantity > 0)
+        ) {
+            return res.status(400).send({ message: "Invalid stock correction" });
+        }
+
+        const data = {
+            database_id: user.database_id,
+            product_id_fk,
+            transaction_type,
+            quantity,
+            transaction_notes,
+        };
         await Product.updateStock(data);
 
         // fetch updated product

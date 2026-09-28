@@ -5,7 +5,7 @@ class User {
     // get all users except admin
     static async getAll() {
         const [rows] = await pool.query(
-            `SELECT * FROM users WHERE user_type = 'user' AND is_deleted = 0`
+            `SELECT * FROM users WHERE user_type = 'user' AND is_deleted = 0`,
         );
         return rows;
     }
@@ -14,7 +14,7 @@ class User {
     static async getAllByUser(id) {
         const [rows] = await pool.query(
             `SELECT ud.database_id, ud.database_name FROM user_database ud INNER JOIN users u ON ud.database_id = u.database_id WHERE u.user_type = 'user' AND u.is_deleted = 0 AND u.database_id != ?`,
-            [id]
+            [id],
         );
         return rows;
     }
@@ -23,7 +23,7 @@ class User {
     static async getUserDatabases(database_id) {
         const [rows] = await pool.query(
             `SELECT database_id, database_name FROM user_database WHERE database_id != ?`,
-            database_id
+            database_id,
         );
         return rows;
     }
@@ -32,7 +32,18 @@ class User {
     static async getById(id) {
         const [rows] = await pool.query(
             `SELECT user_id, username, first_name, last_name, user_type, last_login FROM users WHERE user_id = ?`,
-            id
+            id,
+        );
+        return rows;
+    }
+
+    // get by id — the row the admin users screen works with. getById above leaves out
+    // database_id and the permission flags, and the admin dialog edits both (database_id
+    // as a hidden value), so a row built from it would re-open with them missing.
+    static async getForAdmin(id) {
+        const [rows] = await pool.query(
+            `SELECT user_id, username, first_name, last_name, user_type, last_login, database_id, edit_stock FROM users WHERE user_id = ?`,
+            id,
         );
         return rows;
     }
@@ -41,7 +52,7 @@ class User {
     static async getDatabaseById(id) {
         const [rows] = await pool.query(
             `SELECT database_id, database_name FROM user_database WHERE database_id = ?`,
-            id
+            id,
         );
         return rows;
     }
@@ -50,7 +61,7 @@ class User {
     static async getByUsername(username) {
         const [rows] = await pool.query(
             `SELECT username FROM users WHERE username = ? AND is_deleted = 0`,
-            username
+            username,
         );
         return rows;
     }
@@ -59,7 +70,7 @@ class User {
     static async getByIdAndUsername(id, username) {
         const [rows] = await pool.query(
             `SELECT username FROM users WHERE user_id != ?  AND username = ? AND is_deleted = 0`,
-            [id, username]
+            [id, username],
         );
         return rows;
     }
@@ -68,7 +79,7 @@ class User {
     static async getByUsernameAndPassword(username, password) {
         const [[rows]] = await pool.query(
             `SELECT u.*, d.database_id, d.database_name FROM users u INNER JOIN user_database d ON u.database_id = d.database_id WHERE u.username = ? AND u.is_deleted = 0`,
-            [username]
+            [username],
         );
 
         if (!rows) return null;
@@ -80,7 +91,7 @@ class User {
         // update last login
         await pool.query(
             `UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE username = ?`,
-            username
+            username,
         );
         return rows;
     }
@@ -89,7 +100,7 @@ class User {
     static async getByPassword(id) {
         const [rows] = await pool.query(
             `SELECT password FROM users WHERE user_id = ?`,
-            id
+            id,
         );
         return rows;
     }
@@ -103,7 +114,7 @@ class User {
             // create database
             const [record] = await connection.query(
                 `INSERT INTO user_database (database_name) VALUES (?)`,
-                [user.username]
+                [user.username],
             );
 
             delete user.confirm_password;
@@ -114,7 +125,7 @@ class User {
 
             const [rows] = await connection.query(
                 `INSERT INTO users SET ?`,
-                user
+                user,
             );
 
             await connection.commit();
@@ -137,7 +148,7 @@ class User {
 
         await pool.query(
             `UPDATE user_database SET database_name = ? WHERE database_id = ?`,
-            [user.username, user.database_id]
+            [user.username, user.database_id],
         );
     }
 
@@ -154,7 +165,7 @@ class User {
     static async delete(id) {
         await pool.query(
             `UPDATE users SET is_deleted = 1 WHERE user_id = ?`,
-            id
+            id,
         );
     }
 }
