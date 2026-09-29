@@ -8,11 +8,8 @@ class AdminHistory {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
+                DATE(O.order_datetime) AS order_date
             	FROM deliver_orders O
-            	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
-				INNER JOIN products S ON S.product_id = M.product_id
 				INNER JOIN user_database U ON O.database_id = U.database_id
 				WHERE O.is_deleted = 0 AND O.admin_id_fk = ?`;
         const params = [database_id];
@@ -33,8 +30,8 @@ class AdminHistory {
             params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` GROUP BY O.order_id
-        ORDER BY order_date DESC, O.invoice_number DESC
+        // headers only: lines are fetched per invoice via GET /admin-history/deliver/:order_id/items
+        sql += ` ORDER BY order_date DESC, O.invoice_number DESC
         LIMIT ? OFFSET ?`;
         params.push(criteria.limit || 100);
         params.push(criteria.offset || 0);
@@ -81,11 +78,8 @@ class AdminHistory {
             A.phone AS supplier_phone,
             A.address AS supplier_address,
             PO.*,
-            DATE(PO.order_datetime) AS order_date,
-            JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id_fk, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_cost', M.unit_cost_usd, 'unit_price', M.unit_cost_usd )) items
+            DATE(PO.order_datetime) AS order_date
             FROM purchase_orders PO
-            INNER JOIN purchase_order_items M ON PO.order_id = M.order_id_fk
-            INNER JOIN products S ON S.product_id = M.product_id_fk
             LEFT JOIN accounts  A ON PO.partner_id_fk  = A.account_id
             WHERE PO.is_deleted = 0`;
         const params = [];
@@ -106,14 +100,30 @@ class AdminHistory {
             params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` GROUP BY PO.order_id
-        ORDER BY order_date DESC, PO.invoice_number DESC
+        // headers only: lines are fetched per invoice via fetchPurchaseItems
+        sql += ` ORDER BY order_date DESC, PO.invoice_number DESC
         LIMIT ? OFFSET ?`;
         params.push(criteria.limit || 100);
         params.push(criteria.offset || 0);
 
         const [rows] = await pool.query(sql, params);
         return rows;
+    }
+
+    // one purchase's lines, same keys the list used to embed. No database_id
+    // filter: purchase_orders.database_id is NULL on every row, so this is scoped
+    // like the list (admin-only route, not deleted). null when not found / deleted.
+    static async fetchPurchaseItems(order_id) {
+        const sql = `SELECT
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id_fk, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_cost', M.unit_cost_usd, 'unit_price', M.unit_cost_usd ))
+                    FROM purchase_order_items M
+                    INNER JOIN products S ON S.product_id = M.product_id_fk
+                    WHERE M.order_id_fk = PO.order_id) items
+            FROM purchase_orders PO
+            WHERE PO.order_id = ? AND PO.is_deleted = 0`;
+        const [rows] = await pool.query(sql, [order_id]);
+        if (!rows.length) return null;
+        return rows[0].items || [];
     }
 
     //fetch suppliers payment history

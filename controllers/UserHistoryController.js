@@ -39,6 +39,23 @@ exports.fetchPendingInvoices = async (req, res, next) => {
     }
 };
 
+// lines of one delivery, fetched on demand (the lists return headers only)
+exports.fetchDeliverItems = async (req, res, next) => {
+    try {
+        const { database_id } = req.user;
+        const { order_id } = req.params;
+        const items = await UserHistory.fetchDeliverItems(order_id, database_id);
+
+        // same answer for "missing", "deleted" and "not yours" so ids can't be probed
+        if (!items) {
+            return res.status(404).send({ message: "Order not found" });
+        }
+        res.status(200).send(items);
+    } catch (error) {
+        next(error);
+    }
+};
+
 exports.approvePendingInvoice = async (req, res, next) => {
     try {
         const io = req.io;

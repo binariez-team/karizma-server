@@ -3,15 +3,13 @@ const moment = require("moment");
 
 class UserHistory {
     // fetch deliver invoices sent
+    // headers only — lines are loaded per invoice by fetchDeliverItems
     static async fetchDeliverHistory(database_id, criteria) {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
+                DATE(O.order_datetime) AS order_date
             	FROM deliver_orders O
-            	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
-				INNER JOIN products S ON S.product_id = M.product_id
                 INNER JOIN user_database U ON O.database_id = U.database_id
 				WHERE O.is_deleted = 0
 				AND O.admin_id_fk = ? `;
@@ -25,8 +23,7 @@ class UserHistory {
             params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` GROUP BY O.order_id
-        ORDER BY order_date DESC, O.invoice_number DESC
+        sql += ` ORDER BY order_date DESC, O.invoice_number DESC
         LIMIT ? OFFSET ?`;
         params.push(criteria.limit || 100);
         params.push(criteria.offset || 0);
@@ -35,16 +32,13 @@ class UserHistory {
         return rows;
     }
 
-    // fetch received deliveries
+    // fetch received deliveries (headers only)
     static async fetchReceivedDeliveries(database_id, criteria) {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
+                DATE(O.order_datetime) AS order_date
             	FROM deliver_orders O
-            	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
-				INNER JOIN products S ON S.product_id = M.product_id
                 INNER JOIN user_database U ON O.admin_id_fk = U.database_id
 				WHERE O.is_deleted = 0
                 AND O.is_approved = 1
@@ -59,8 +53,7 @@ class UserHistory {
             params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` GROUP BY O.order_id
-        ORDER BY order_date DESC, O.invoice_number DESC
+        sql += ` ORDER BY order_date DESC, O.invoice_number DESC
         LIMIT ? OFFSET ?`;
         params.push(criteria.limit || 100);
         params.push(criteria.offset || 0);
@@ -69,25 +62,49 @@ class UserHistory {
         return rows;
     }
 
-    // fetch pending
+    // fetch pending (headers only)
     static async fetchPendingInvoices(database_id) {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price)) items
+                DATE(O.order_datetime) AS order_date
             	FROM deliver_orders O
-            	INNER JOIN deliver_order_items M ON O.order_id = M.order_id_fk
-				INNER JOIN products S ON S.product_id = M.product_id
 				INNER JOIN user_database U ON O.admin_id_fk = U.database_id
 				WHERE O.is_deleted = 0
 				AND O.is_approved = 0
-				AND O.database_id = ? 
-				GROUP BY O.order_id
+				AND O.database_id = ?
 				ORDER BY order_date DESC, O.invoice_number DESC`;
 
         const [rows] = await pool.query(sql, [database_id]);
         return rows;
+    }
+
+    // Lines of ONE delivery, shared by every deliver list (admin + user).
+    // Readable by its sender (admin_id_fk) or its receiver (database_id), both
+    // taken from the caller's token; `senderOnly` narrows it to the sender, as
+    // the admin list is. Returns null for missing / deleted / someone else's
+    // order so the controller can answer a uniform 404.
+    static async fetchDeliverItems(order_id, database_id, senderOnly = false) {
+        const [[order]] = await pool.query(
+            `SELECT order_id FROM deliver_orders
+            WHERE order_id = ? AND is_deleted = 0
+            AND (admin_id_fk = ? OR (? = 0 AND database_id = ?))`,
+            [order_id, database_id, senderOnly ? 1 : 0, database_id]
+        );
+        if (!order) return null;
+
+        // Same JSON_OBJECT keys the lists used to embed: edit sends these back and
+        // DeliverModel.update INSERTs them with SET ?, so an extra key would break
+        // it. JSON also keeps unit_price a number (a plain DECIMAL is a string).
+        const [rows] = await pool.query(
+            `SELECT JSON_OBJECT('record_id', M.record_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'unit_price', M.unit_price) AS item
+            FROM deliver_order_items M
+            INNER JOIN products S ON S.product_id = M.product_id
+            WHERE M.order_id_fk = ? AND M.is_deleted = 0
+            ORDER BY M.record_id`,
+            [order_id]
+        );
+        return rows.map((row) => row.item);
     }
 
     // `database_id` is the RECEIVING tenant and must come from the caller's token.

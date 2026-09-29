@@ -82,18 +82,16 @@ class History {
         return results;
     }
 
-    // fetch sales invoices
+    // fetch sales invoices — headers only; the lines are fetched per invoice
+    // (fetchSalesOrderItems) because aggregating them for every row made the list slow
     static async fetchSalesHistory(database_id, criteria) {
         let sql = `SELECT
                 A.name AS customer_name,
                 A.phone AS customer_phone,
                 A.address AS customer_address,
                 O.*,
-                DATE(O.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'sku', S.sku, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'avg_cost', M.avg_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
+                DATE(O.order_datetime) AS order_date
             FROM sales_orders O
-            INNER JOIN sales_order_items M ON O.order_id = M.order_id
-            INNER JOIN products S ON S.product_id = M.product_id
             LEFT JOIN accounts  A ON O.customer_id = A.account_id
             WHERE O.is_deleted = 0 AND O.database_id = ? `;
         const params = [database_id];
@@ -114,12 +112,30 @@ class History {
             params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` GROUP BY O.order_id
-        ORDER BY order_date DESC, O.invoice_number DESC`;
+        sql += ` ORDER BY order_date DESC, O.invoice_number DESC`;
 
         const [rows] = await pool.query(sql, params);
 
         return rows;
+    }
+
+    // lines of one sales invoice, same shape the list used to embed (the edit
+    // dialog round-trips them). null when the invoice is not this database's or
+    // is deleted; [] when it has no lines.
+    static async fetchSalesOrderItems(order_id, database_id) {
+        const sql = `SELECT
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'sku', S.sku, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'avg_cost', M.avg_cost, 'unit_price', M.unit_price, 'total_price', M.total_price))
+                    FROM sales_order_items M
+                    INNER JOIN products S ON S.product_id = M.product_id
+                    WHERE M.order_id = O.order_id) items
+            FROM sales_orders O
+            WHERE O.order_id = ? AND O.is_deleted = 0 AND O.database_id = ?`;
+        const [rows] = await pool.query(sql, [order_id, database_id]);
+        if (!rows.length) return null;
+        // mysql2 parses JSON columns; parse here too in case the scalar
+        // subquery's type reaches the driver as text
+        const { items } = rows[0];
+        return (typeof items === "string" ? JSON.parse(items) : items) || [];
     }
 
     // fetch products sales history
@@ -208,18 +224,15 @@ class History {
         return rows;
     }
 
-    //fetch return history
+    //fetch return history — headers only; lines come from fetchReturnOrderItems
     static async fetchReturnHistory(database_id, criteria) {
         let sql = `SELECT
                 A.name AS customer_name,
                 A.phone AS customer_phone,
                 A.address AS customer_address,
                 RO.*,
-                DATE(RO.order_datetime) AS order_date,
-                JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'avg_cost', M.avg_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
+                DATE(RO.order_datetime) AS order_date
             FROM return_orders RO
-            INNER JOIN return_order_items M ON RO.order_id = M.order_id
-            INNER JOIN products S ON S.product_id = M.product_id
             INNER JOIN accounts  A ON RO.customer_id = A.account_id
             WHERE RO.is_deleted = 0 AND A.database_id = ? `;
         const params = [database_id];
@@ -240,14 +253,30 @@ class History {
             params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
         }
 
-        sql += ` GROUP BY RO.order_id
-        ORDER BY order_date DESC, RO.invoice_number DESC
+        sql += ` ORDER BY order_date DESC, RO.invoice_number DESC
         LIMIT ? OFFSET ?`;
         params.push(criteria.limit || 100);
         params.push(criteria.offset || 0);
 
         const [rows] = await pool.query(sql, params);
         return rows;
+    }
+
+    // lines of one return, same shape the list used to embed; scoped through
+    // the customer's database like the list. null when not found / deleted.
+    static async fetchReturnOrderItems(order_id, database_id) {
+        const sql = `SELECT
+                (SELECT JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'avg_cost', M.avg_cost, 'unit_price', M.unit_price, 'total_price', M.total_price))
+                    FROM return_order_items M
+                    INNER JOIN products S ON S.product_id = M.product_id
+                    WHERE M.order_id = RO.order_id) items
+            FROM return_orders RO
+            INNER JOIN accounts  A ON RO.customer_id = A.account_id
+            WHERE RO.order_id = ? AND RO.is_deleted = 0 AND A.database_id = ?`;
+        const [rows] = await pool.query(sql, [order_id, database_id]);
+        if (!rows.length) return null;
+        const { items } = rows[0];
+        return (typeof items === "string" ? JSON.parse(items) : items) || [];
     }
 
     // fetch return order items by order id

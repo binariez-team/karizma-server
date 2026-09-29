@@ -38,6 +38,23 @@ exports.fetchSalesHistory = async (req, res, next) => {
     }
 };
 
+// lines of one sales invoice, fetched on demand by the history screen
+exports.fetchSalesOrderItems = async (req, res, next) => {
+    try {
+        const { database_id } = req.user;
+        const items = await History.fetchSalesOrderItems(
+            req.params.order_id,
+            database_id,
+        );
+        if (!items) {
+            return res.status(404).send({ message: "Order not found" });
+        }
+        res.status(200).send(items);
+    } catch (error) {
+        next(error);
+    }
+};
+
 // fetch products history
 exports.fetchProductsSalesHistory = async (req, res, next) => {
     try {
@@ -82,6 +99,23 @@ exports.fetchReturnHistory = async (req, res, next) => {
         const criteria = req.body;
         let returns = await History.fetchReturnHistory(database_id, criteria);
         res.status(200).send(returns);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// lines of one return, fetched on demand by the history screen
+exports.fetchReturnOrderItems = async (req, res, next) => {
+    try {
+        const database_id = req.user.database_id;
+        const items = await History.fetchReturnOrderItems(
+            req.params.order_id,
+            database_id,
+        );
+        if (!items) {
+            return res.status(404).send({ message: "Order not found" });
+        }
+        res.status(200).send(items);
     } catch (error) {
         next(error);
     }

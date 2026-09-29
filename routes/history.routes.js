@@ -7,11 +7,13 @@ router.get("/product/:id", HistoryController.getProductHistoryById);
 
 router.post("/sales/search", HistoryController.fetchSalesHistory);
 router.post("/sales/details", HistoryController.fetchOrderItemsById);
+router.get("/sales/:order_id/items", HistoryController.fetchSalesOrderItems);
 
 router.post("/products/search", HistoryController.fetchProductsSalesHistory);
 
 router.post("/return/search", HistoryController.fetchReturnHistory);
 router.post("/returns/details", HistoryController.fetchReturnOrderItemsById);
+router.get("/return/:order_id/items", HistoryController.fetchReturnOrderItems);
 
 router.post("/payment/search", HistoryController.fetchPaymentHistory);
 router.post("/dispose/search", HistoryController.fetchDisposeHistory);

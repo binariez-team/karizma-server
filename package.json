@@ -1,6 +1,6 @@
 {
     "name": "server",
-    "version": "1.9.0",
+    "version": "1.9.3",
     "description": "express server for karizma app",
     "main": "index.js",
     "scripts": {
