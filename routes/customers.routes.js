@@ -1,12 +1,18 @@
 const express = require("express");
 const router = express.Router();
-const { admin } = require("../middleware/auth");
+const { admin, requirePermission } = require("../middleware/auth");
 
 const CustomersController = require("../controllers/CustomersController");
 
 router.get("/debts", CustomersController.getCustomerDebts);
 
-router.post("/debts", CustomersController.addManualDebt);
+// "Correct Debt" on the statements screen — users need users.correct_debt; admins
+// always pass (the admin statements screen posts here too)
+router.post(
+    "/debts",
+    requirePermission("correct_debt"),
+    CustomersController.addManualDebt,
+);
 
 router.get("/", CustomersController.getCustomersByUserId);
 router.get("/:account_id", CustomersController.getCustomerByIdAndUserId);

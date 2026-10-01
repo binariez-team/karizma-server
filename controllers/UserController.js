@@ -1,10 +1,11 @@
 const User = require("../models/UserModel");
 
-// users.edit_stock is TINYINT(1) NOT NULL DEFAULT 0. The dialog sends a boolean; a null
-// (e.g. from a client built before the toggle existed) would fail the write under
-// STRICT_TRANS_TABLES, so coerce whatever arrives to 0/1.
+// users.edit_stock / users.correct_debt are TINYINT(1) NOT NULL DEFAULT 0. The dialog
+// sends a boolean; a null (e.g. from a client built before the toggle existed) would
+// fail the write under STRICT_TRANS_TABLES, so coerce whatever arrives to 0/1.
 const normalizePermissions = (user) => {
     if ("edit_stock" in user) user.edit_stock = user.edit_stock ? 1 : 0;
+    if ("correct_debt" in user) user.correct_debt = user.correct_debt ? 1 : 0;
 };
 
 // get users

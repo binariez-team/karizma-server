@@ -42,7 +42,7 @@ class User {
     // as a hidden value), so a row built from it would re-open with them missing.
     static async getForAdmin(id) {
         const [rows] = await pool.query(
-            `SELECT user_id, username, first_name, last_name, user_type, last_login, database_id, edit_stock FROM users WHERE user_id = ?`,
+            `SELECT user_id, username, first_name, last_name, user_type, last_login, database_id, edit_stock, correct_debt FROM users WHERE user_id = ?`,
             id,
         );
         return rows;

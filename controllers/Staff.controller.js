@@ -5,7 +5,8 @@ const User = require("../models/UserModel");
 // Staff rows live in `users` and are written with `SET ?`, so passing req.body through
 // would let the caller set anything on the row: user_type (promote to admin),
 // database_id (move into another tenant), or permissions that are not the user's to
-// hand out, such as edit_stock — which would defeat requirePermission entirely.
+// hand out, such as edit_stock or correct_debt — which would defeat requirePermission
+// entirely.
 const STAFF_FIELDS = [
     "username",
     "password",

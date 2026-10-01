@@ -47,6 +47,7 @@ exports.updateProfile = async (req, res, next) => {
                     view_cost: result.view_cost,
                     transfer_money: result.transfer_money,
                     edit_stock: result.edit_stock,
+                    correct_debt: result.correct_debt,
                 },
             };
             res.status(200).send(updatedUser);
