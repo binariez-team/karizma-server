@@ -300,6 +300,7 @@ class ReturnModel {
 
             // update inventory qty for deleted items
             let inventoryQueries = "";
+            let inventoryParams = [];
             let product_id = null;
             let quantity = null;
 
@@ -338,9 +339,11 @@ class ReturnModel {
                 product_id = element.product_id;
                 quantity = element.quantity;
                 // update inventory
-                inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) VALUES (${product_id}, ${database_id}, 'RETURN', ${quantity});`;
+                // parameterized: values were interpolated into SQL with multipleStatements on
+                inventoryParams.push(product_id, database_id, quantity);
+                inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity) VALUES (?, ?, 'RETURN', ?);`;
             });
-            await connection.query(inventoryQueries);
+            await connection.query(inventoryQueries, inventoryParams);
 
             //delete voucher and items
             let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;

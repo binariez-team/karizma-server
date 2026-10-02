@@ -12,6 +12,19 @@ const InventoryCosting = require("./InventoryCosting");
 // NULL on rows created before the column existed; approvePendingInvoice falls back to
 // the sender's live average for those.
 
+// order_id, invoice_number and product_id come from the request body and are bound to
+// `?`, where mysql2 expands a plain object into `key` = value pairs: {"is_deleted":0}
+// would turn update()'s `WHERE order_id = ?` into a predicate matching every tenant's
+// rows. The old interpolated INSERT broke on objects ([object Object]) and rolled the
+// transaction back whenever there were items; refusing them up front keeps that outcome
+// and also covers an empty items list. Arrays render as a plain list (never an
+// identifier) and are left as they were.
+function rejectObject(value, field) {
+    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        throw new Error(`Invalid ${field}`);
+    }
+}
+
 class DeliverInvoice {
     /**
      * The sender's cost basis for a product at this instant. Falls back to their last
@@ -94,6 +107,7 @@ class DeliverInvoice {
                 const productName = record.product_name;
                 delete record.product_name;
                 delete record.stock;
+                rejectObject(record.product_id, "product_id");
 
                 // Snapshot the sender's cost as the goods leave, and refuse the dispatch
                 // outright if there is no cost to snapshot. Pinning it here means the
@@ -118,12 +132,17 @@ class DeliverInvoice {
                 );
 
                 // add record to inventory transactions
+                // parameterized: values were interpolated into SQL with multipleStatements on
+                // (record.product_id comes straight from the request body)
                 await connection.query(
-                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (${
-                        record.product_id
-                    }, ${
-                        order.admin_id_fk
-                    }, ${-record.quantity}, 'DELIVER', '${invoice_number}', ${order_id});`,
+                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (?, ?, ?, 'DELIVER', ?, ?);`,
+                    [
+                        record.product_id,
+                        order.admin_id_fk,
+                        -record.quantity,
+                        invoice_number,
+                        order_id,
+                    ],
                 );
 
                 // Dispatch deliberately does NOT touch the sender's costs.
@@ -174,6 +193,8 @@ class DeliverInvoice {
                 `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
             order.admin_id_fk = user.database_id;
+            rejectObject(order.order_id, "order_id");
+            rejectObject(order.invoice_number, "invoice_number");
 
             let [[checkPending]] = await connection.query(
                 `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0`,
@@ -239,6 +260,7 @@ class DeliverInvoice {
                 const productName = record.product_name;
                 delete record.product_name;
                 delete record.stock;
+                rejectObject(record.product_id, "product_id");
 
                 // re-snapshot on edit — the line may now be a different product or
                 // quantity, and the order is still pending so nothing has been received
@@ -261,11 +283,14 @@ class DeliverInvoice {
 
                 // add admin record to inventory transactions
                 await connection.query(
-                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (${
-                        record.product_id
-                    }, ${order.admin_id_fk}, ${-record.quantity}, 'DELIVER', '${
-                        order.invoice_number
-                    }', ${order.order_id});`,
+                    `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (?, ?, ?, 'DELIVER', ?, ?);`,
+                    [
+                        record.product_id,
+                        order.admin_id_fk,
+                        -record.quantity,
+                        order.invoice_number,
+                        order.order_id,
+                    ],
                 );
             }
 

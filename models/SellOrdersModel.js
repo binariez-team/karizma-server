@@ -530,20 +530,27 @@ class SellOrders {
             );
 
             //add order_items to inventory transactions
+            // parameterized: values were interpolated into SQL with multipleStatements on
+            // (product_id/order_id come from the body; invoice_number is body-written below).
             let inventoryQueries = "";
+            let inventoryParams = [];
             let product_id = null;
             let quantity = null;
             items.forEach((element) => {
                 product_id = element.product_id;
                 quantity = element.quantity;
                 // update inventory
-                inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, transaction_datetime, quantity, order_id_fk, transaction_notes) VALUES (${product_id}, ${database_id}, 'SALE', '${
-                    orderCheck.order_datetime
-                }', ${-quantity}, ${order_id}, '${
-                    orderCheck.invoice_number
-                }');`;
+                inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, transaction_datetime, quantity, order_id_fk, transaction_notes) VALUES (?, ?, 'SALE', ?, ?, ?, ?);`;
+                inventoryParams.push(
+                    product_id,
+                    database_id,
+                    orderCheck.order_datetime,
+                    -quantity,
+                    order_id,
+                    orderCheck.invoice_number,
+                );
             });
-            await connection.query(inventoryQueries);
+            await connection.query(inventoryQueries, inventoryParams);
 
             //delete voucher and items
             let deleteVoucherQuery = `DELETE FROM journal_vouchers WHERE journal_id = ?`;
@@ -829,8 +836,8 @@ class SellOrders {
 
             // add deleted items to inventory transactions
             await connection.query(
-                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity, transaction_notes) SELECT product_id, ?, 'DELETE', quantity, '${orderCheck.invoice_number}' FROM sales_order_items WHERE order_id = ? AND is_deleted = 0`,
-                [database_id, order_id],
+                `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, quantity, transaction_notes) SELECT product_id, ?, 'DELETE', quantity, ? FROM sales_order_items WHERE order_id = ? AND is_deleted = 0`,
+                [database_id, orderCheck.invoice_number, order_id],
             );
 
             //delete voucher and items

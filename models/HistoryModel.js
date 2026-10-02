@@ -69,16 +69,22 @@ class History {
         return rows;
     }
 
-    // fetch order items by order id
-    static async fetchOrderItemsById(ids) {
+    // fetch order items by order id (Statements). Joined to the invoice and
+    // scoped like fetchSalesOrderItems: ids of another database's or a deleted
+    // invoice just return no lines. ORDER BY pins line order (entry order), which
+    // the join could otherwise change.
+    static async fetchOrderItemsById(ids, database_id) {
         let query = `SELECT
             I.*,
             P.product_name
             FROM sales_order_items I
+            INNER JOIN sales_orders O ON O.order_id = I.order_id
             INNER JOIN products P ON I.product_id = P.product_id
             WHERE I.is_deleted = 0
-            AND order_id IN (?)`;
-        let [results] = await pool.query(query, [ids]);
+            AND O.is_deleted = 0 AND O.database_id = ?
+            AND I.order_id IN (?)
+            ORDER BY I.order_id, I.order_item_id`;
+        let [results] = await pool.query(query, [database_id, ids]);
         return results;
     }
 
@@ -279,16 +285,22 @@ class History {
         return (typeof items === "string" ? JSON.parse(items) : items) || [];
     }
 
-    // fetch return order items by order id
-    static async fetchReturnOrderItemsById(ids) {
+    // fetch return order items by order id (Statements). Scoped through the
+    // customer's database like fetchReturnOrderItems: ids of another database's
+    // or a deleted return just return no lines. ORDER BY as above.
+    static async fetchReturnOrderItemsById(ids, database_id) {
         let query = `SELECT
             ROI.*,
             P.product_name
             FROM return_order_items ROI
+            INNER JOIN return_orders RO ON RO.order_id = ROI.order_id
+            INNER JOIN accounts A ON RO.customer_id = A.account_id
             INNER JOIN products P ON ROI.product_id = P.product_id
             WHERE ROI.is_deleted = 0
-            AND order_id IN (?)`;
-        let [results] = await pool.query(query, [ids]);
+            AND RO.is_deleted = 0 AND A.database_id = ?
+            AND ROI.order_id IN (?)
+            ORDER BY ROI.order_id, ROI.order_item_id`;
+        let [results] = await pool.query(query, [database_id, ids]);
         return results;
     }
 

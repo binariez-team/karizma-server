@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const moment = require("moment-timezone");
+const { invoiceContains } = require("./UserHistoryModel");
 
 class AdminHistory {
     // fetch deliver invoices for admin
@@ -13,10 +14,13 @@ class AdminHistory {
 				INNER JOIN user_database U ON O.database_id = U.database_id
 				WHERE O.is_deleted = 0 AND O.admin_id_fk = ?`;
         const params = [database_id];
+        // \ % _ match literally: the same partial match as the user deliver lists
         if (criteria.invoice_number) {
             sql += ` AND O.invoice_number LIKE ?`;
-            params.push(`%${criteria.invoice_number}%`);
+            params.push(invoiceContains(criteria.invoice_number));
         }
+        // user_id is the recipient's database_id (the client offers the
+        // GET /deliver/users list), not users.user_id
         if (criteria.user_id) {
             sql += ` AND O.database_id = ?`;
             params.push(criteria.user_id);

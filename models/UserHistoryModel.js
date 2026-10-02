@@ -1,6 +1,14 @@
 const pool = require("../config/database");
 const moment = require("moment");
 
+// Partial invoice match for all three deliver lists (Sent, Received, admin
+// via AdminHistoryModel), so "5003" still finds 5003. \ % _ in the term are
+// escaped so they match literally: \ is LIKE's default escape character, and
+// mysql2 doubles it inside the quoted value, so LIKE receives the pattern
+// exactly as built here.
+const invoiceContains = (term) =>
+    `%${String(term).replace(/[\\%_]/g, "\\$&")}%`;
+
 class UserHistory {
     // fetch deliver invoices sent
     // headers only — lines are loaded per invoice by fetchDeliverItems
@@ -15,9 +23,25 @@ class UserHistory {
 				AND O.admin_id_fk = ? `;
         const params = [database_id];
         if (criteria.invoice_number) {
-            sql += ` AND O.invoice_number = ?`;
-            params.push(criteria.invoice_number);
+            sql += ` AND O.invoice_number LIKE ?`;
+            params.push(invoiceContains(criteria.invoice_number));
         }
+        // the recipient (validated positive integer in the controller); ANDed
+        // with admin_id_fk above, so it only narrows the caller's own sends
+        if (criteria.user_id) {
+            sql += ` AND O.database_id = ?`;
+            params.push(criteria.user_id);
+        }
+        // From / To (yyyy-MM-dd, both inclusive)
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
+        }
+        // single day sent by client bundles from before From / To
         if (criteria.order_date) {
             sql += ` AND DATE(order_datetime) = ?`;
             params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
@@ -45,9 +69,25 @@ class UserHistory {
 				AND O.database_id = ? `;
         const params = [database_id];
         if (criteria.invoice_number) {
-            sql += ` AND O.invoice_number = ?`;
-            params.push(criteria.invoice_number);
+            sql += ` AND O.invoice_number LIKE ?`;
+            params.push(invoiceContains(criteria.invoice_number));
         }
+        // the sender (validated positive integer in the controller); ANDed
+        // with database_id above, so it only narrows the caller's own receipts
+        if (criteria.user_id) {
+            sql += ` AND O.admin_id_fk = ?`;
+            params.push(criteria.user_id);
+        }
+        // From / To (yyyy-MM-dd, both inclusive)
+        if (criteria.start_date) {
+            sql += ` AND DATE(order_datetime) >= ?`;
+            params.push(moment(criteria.start_date).format("yyyy-MM-DD"));
+        }
+        if (criteria.end_date) {
+            sql += ` AND DATE(order_datetime) <= ?`;
+            params.push(moment(criteria.end_date).format("yyyy-MM-DD"));
+        }
+        // single day sent by client bundles from before From / To
         if (criteria.order_date) {
             sql += ` AND DATE(order_datetime) = ?`;
             params.push(moment(criteria.order_date).format("yyyy-MM-DD"));
@@ -59,6 +99,23 @@ class UserHistory {
         params.push(criteria.offset || 0);
 
         const [rows] = await pool.query(sql, params);
+        return rows;
+    }
+
+    // Senders for the received list's user filter, taken from the same rows
+    // that list shows (approved, not deleted, received by the caller) so every
+    // option matches something, whether the sender is a user or the admin.
+    static async fetchReceivedDeliverySenders(database_id) {
+        const [rows] = await pool.query(
+            `SELECT DISTINCT U.database_id, U.database_name
+            FROM deliver_orders O
+            INNER JOIN user_database U ON O.admin_id_fk = U.database_id
+            WHERE O.is_deleted = 0
+            AND O.is_approved = 1
+            AND O.database_id = ?
+            ORDER BY U.database_name, U.database_id`,
+            [database_id]
+        );
         return rows;
     }
 
@@ -344,3 +401,5 @@ class UserHistory {
 }
 
 module.exports = UserHistory;
+// one escaper for every deliver search, so the screens can't match differently
+module.exports.invoiceContains = invoiceContains;

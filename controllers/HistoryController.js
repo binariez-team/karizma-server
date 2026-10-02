@@ -1,5 +1,28 @@
 const History = require("../models/HistoryModel");
 
+const INVALID_ORDER_IDS = { message: "Invalid order ids" };
+// Statements posts one id per statement row (invoices and returns mixed). Far
+// above any one customer's statement, and the default 100kb JSON body cannot
+// carry many more ids anyway.
+const MAX_ORDER_IDS = 10000;
+
+// The details bodies are bound to `IN (?)`, where mysql2 expands an object
+// into `key = value` SQL, so only a list of positive integers (numbers or
+// numeric strings) gets through. Returns the deduped ids, or null when invalid.
+const toOrderIds = (body) => {
+    if (!Array.isArray(body) || body.length > MAX_ORDER_IDS) return null;
+    const ids = new Set();
+    for (const value of body) {
+        const id =
+            typeof value === "string" || typeof value === "number"
+                ? Number(value)
+                : NaN;
+        if (!Number.isSafeInteger(id) || id < 1) return null;
+        ids.add(id);
+    }
+    return [...ids];
+};
+
 // product history
 exports.getProductHistoryById = async (req, res, next) => {
     try {
@@ -18,8 +41,14 @@ exports.getProductHistoryById = async (req, res, next) => {
 // fetch order items by order id
 exports.fetchOrderItemsById = async (req, res, next) => {
     try {
-        let ids = req.body;
-        let results = await History.fetchOrderItemsById(ids);
+        const ids = toOrderIds(req.body);
+        if (!ids) return res.status(400).json(INVALID_ORDER_IDS);
+        // `IN ()` is a SQL error
+        if (!ids.length) return res.status(200).send([]);
+        let results = await History.fetchOrderItemsById(
+            ids,
+            req.user.database_id,
+        );
         res.status(200).send(results);
     } catch (error) {
         next(error);
@@ -74,8 +103,13 @@ exports.fetchProductsSalesHistory = async (req, res, next) => {
 // fetch return order items by id
 exports.fetchReturnOrderItemsById = async (req, res, next) => {
     try {
-        let ids = req.body;
-        let results = await History.fetchReturnOrderItemsById(ids);
+        const ids = toOrderIds(req.body);
+        if (!ids) return res.status(400).json(INVALID_ORDER_IDS);
+        if (!ids.length) return res.status(200).send([]);
+        let results = await History.fetchReturnOrderItemsById(
+            ids,
+            req.user.database_id,
+        );
         res.status(200).send(results);
     } catch (error) {
         next(error);

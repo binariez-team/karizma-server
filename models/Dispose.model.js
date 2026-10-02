@@ -126,20 +126,29 @@ class Dispose {
             );
 
             //add order_items to inventory transactions
+            // parameterized: values were interpolated into SQL with multipleStatements on
+            // (product_id and dispose_datetime come from the body, dispose_id from the
+            // path, and invoice_number is re-read from a row the client can write), so
+            // a value carrying "'; ..." ran as extra statements inside this transaction.
             let inventoryQueries = "";
+            const inventoryParams = [];
             let product_id = null;
             let quantity = null;
             products.forEach((element) => {
                 product_id = element.product_id;
                 quantity = element.quantity;
                 // update inventory
-                inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, transaction_datetime, quantity, order_id_fk, transaction_notes) VALUES (${product_id}, ${database_id}, 'DISPOSE', '${
-                    info.dispose_datetime
-                }', ${-quantity}, ${dispose_id}, '${
-                    orderCheck.invoice_number
-                }');`;
+                inventoryQueries += `INSERT INTO inventory_transactions (product_id_fk, database_id, transaction_type, transaction_datetime, quantity, order_id_fk, transaction_notes) VALUES (?, ?, 'DISPOSE', ?, ?, ?, ?);`;
+                inventoryParams.push(
+                    product_id,
+                    database_id,
+                    info.dispose_datetime,
+                    -quantity,
+                    dispose_id,
+                    orderCheck.invoice_number,
+                );
             });
-            await connection.query(inventoryQueries);
+            await connection.query(inventoryQueries, inventoryParams);
 
             // delete old items
             await connection.query(

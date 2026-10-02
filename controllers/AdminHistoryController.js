@@ -1,9 +1,15 @@
 const AdminHistory = require("../models/AdminHistoryModel");
 const UserHistory = require("../models/UserHistoryModel");
+const { deliverCriteria } = require("./UserHistoryController");
 
 exports.fetchDeliverHistory = async (req, res, next) => {
     try {
-        const criteria = req.body;
+        // same checks as the user deliver searches: every criterion is bound
+        // to `?`, where mysql2 would expand an object into SQL
+        const { criteria, error } = deliverCriteria(req.body);
+        if (error) {
+            return res.status(400).send({ message: error });
+        }
         const { database_id } = req.user;
         let invoices = await AdminHistory.fetchDeliverHistory(
             criteria,
