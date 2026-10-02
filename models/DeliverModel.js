@@ -18,7 +18,9 @@ const InventoryCosting = require("./InventoryCosting");
 // rows. The old interpolated INSERT broke on objects ([object Object]) and rolled the
 // transaction back whenever there were items; refusing them up front keeps that outcome
 // and also covers an empty items list. Arrays render as a plain list (never an
-// identifier) and are left as they were.
+// identifier) and are left as they were. The same expansion inside update()'s
+// `SET ... notes = ?` would append arbitrary column assignments (is_approved,
+// admin_id_fk, ...) to the row, so total_price, database_id and notes are refused too.
 function rejectObject(value, field) {
     if (value !== null && typeof value === "object" && !Array.isArray(value)) {
         throw new Error(`Invalid ${field}`);
@@ -74,6 +76,13 @@ class DeliverInvoice {
         try {
             await connection.beginTransaction();
 
+            // `order` is the values argument of `SET ?` below. Sent as an array, mysql2
+            // binds order[0] straight from the body, so the admin_id_fk override (set on
+            // the array, not the element) never reaches the INSERT.
+            if (!order || typeof order !== "object" || Array.isArray(order)) {
+                throw new Error("Invalid order");
+            }
+
             moment.tz.setDefault("Asia/Beirut");
             order.order_datetime = moment(order.order_datetime).format(
                 `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
@@ -83,7 +92,7 @@ class DeliverInvoice {
             // insert into deliver_orders
             const [result] = await connection.query(
                 `INSERT INTO deliver_orders SET ?`,
-                order,
+                [order],
             );
 
             // inserted order ID
@@ -195,6 +204,9 @@ class DeliverInvoice {
             order.admin_id_fk = user.database_id;
             rejectObject(order.order_id, "order_id");
             rejectObject(order.invoice_number, "invoice_number");
+            rejectObject(order.total_price, "total_price");
+            rejectObject(order.database_id, "database_id");
+            rejectObject(order.notes, "notes");
 
             let [[checkPending]] = await connection.query(
                 `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0`,
@@ -282,6 +294,8 @@ class DeliverInvoice {
                 );
 
                 // add admin record to inventory transactions
+                // parameterized: values were interpolated into SQL with multipleStatements on
+                // (order.invoice_number, order.order_id and record.product_id come from the body)
                 await connection.query(
                     `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (?, ?, ?, 'DELIVER', ?, ?);`,
                     [

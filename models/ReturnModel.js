@@ -2,6 +2,18 @@ const pool = require("../config/database");
 const moment = require("moment-timezone");
 const Accounts = require("./AccountsModel");
 
+// Raw body ids reach `?`, where mysql2 renders a JSON object as SQL: {"is_deleted":0}
+// -> `is_deleted` = 0, which turns e.g. the per-product cost UPDATE into one matching
+// every product of the tenant. Only whole-number ids pass.
+const isId = (v) =>
+    (typeof v === "number" || (typeof v === "string" && /^\d+$/.test(v))) &&
+    Number.isSafeInteger(Number(v)) &&
+    Number(v) > 0;
+const assertItemIds = (items) => {
+    if (!Array.isArray(items) || !items.every((item) => isId(item?.product_id)))
+        throw new Error("Every item needs a valid product.");
+};
+
 class ReturnModel {
     /**
      * Move the value of returned goods into or out of the weighted average.
@@ -94,6 +106,7 @@ class ReturnModel {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
+            assertItemIds(items);
 
             moment.tz.setDefault("Asia/Beirut");
             order.order_datetime = moment(order.order_datetime).format(
@@ -290,6 +303,8 @@ class ReturnModel {
             await connection.beginTransaction();
 
             let order_id = order.order_id;
+            if (!isId(order_id)) throw new Error("Order not found");
+            assertItemIds(items);
 
             //check existing order for user
             let [[orderCheck]] = await connection.query(

@@ -337,6 +337,18 @@ class SellOrders {
             if (!Array.isArray(items) || items.length === 0)
                 throw new Error("An invoice must have at least one item.");
 
+            // These raw body ids reach `?`, where mysql2 renders a JSON object as SQL:
+            // {"is_deleted":0} -> `is_deleted` = 0, which matches every tenant's rows in the
+            // DELETEs below that have no database_id filter. Only whole-number ids pass.
+            const isId = (v) =>
+                (typeof v === "number" ||
+                    (typeof v === "string" && /^\d+$/.test(v))) &&
+                Number.isSafeInteger(Number(v)) &&
+                Number(v) > 0;
+            if (!isId(order_id)) throw new Error("Order not found");
+            if (!items.every((item) => isId(item?.product_id)))
+                throw new Error("Every item needs a valid product.");
+
             //check existing order for user
             // is_deleted = 0 stops a soft-deleted invoice being resurrected: deleteOrder()
             // writes compensating 'DELETE' stock rows that the 'SALE' cleanup below can

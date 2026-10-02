@@ -25,13 +25,10 @@ class Category {
 		const params = [];
 		categories.forEach((element) => {
 			const categoryId = element.category_id;
-			// a plain object bound to ? is expanded by mysql2 into `key` = value
-			// pairs (rewriting the WHERE); the old text form errored on it anyway
-			if (
-				categoryId !== null &&
-				typeof categoryId === "object" &&
-				!Array.isArray(categoryId)
-			) {
+			// scalars only: mysql2 expands a bound object into `key` = value pairs
+			// (rewriting the WHERE), and an array whose element has a non-function
+			// toString throws inside the pool's nextTick and crashes the process
+			if (categoryId !== null && typeof categoryId === "object") {
 				throw new Error("Invalid category_id");
 			}
 			query += `UPDATE products_categories SET category_index = ? WHERE category_id = ?;`;
