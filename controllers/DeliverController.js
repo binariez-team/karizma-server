@@ -1,11 +1,39 @@
 const DeliverInvoice = require("../models/DeliverModel");
-const User = require("../models/UserModel");
 
-exports.getUsers = async (req, res, next) => {
+// GET /deliver/recipients — { database_id, database_name } rows, the same for every
+// role. Also answers the deprecated /deliver/users and /user-deliver/users, so older
+// web/Electron builds get the same safe list (no admin tenant) as the new screen.
+exports.getRecipients = async (req, res, next) => {
     try {
         const { database_id } = req.user;
-        const users = await User.getUserDatabases(database_id);
-        res.status(200).send(users);
+        const recipients = await DeliverInvoice.getRecipients(database_id);
+        res.status(200).send(recipients);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Who may see a recipient's quantities on the deliver screen. Admin only for now: it
+// shows another tenant's stock, which users and staff otherwise never see. To open it
+// to users later, widen this one check (the client's DeliverService.canSeeRecipientStock
+// is the matching switch); getRecipientStock still limits every caller to tenants it
+// may deliver to.
+const canSeeRecipientStock = (user) => user?.user_type === "admin";
+
+// GET /deliver/recipients/:database_id/stock — [{ product_id, quantity }]
+exports.getRecipientStock = async (req, res, next) => {
+    try {
+        // before anything else: refused callers never reach the database
+        if (!canSeeRecipientStock(req.user)) {
+            return res
+                .status(403)
+                .send({ message: "You don't have permission to do this" });
+        }
+        const stock = await DeliverInvoice.getRecipientStock(
+            req.params.database_id,
+            req.user.database_id,
+        );
+        res.status(200).send(stock);
     } catch (error) {
         next(error);
     }

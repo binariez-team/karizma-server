@@ -1,13 +1,10 @@
 const express = require("express");
 const router = express.Router();
 
-// const DeliverController = require("../controllers/DeliverController");
-const UserDeliverController = require("../controllers/UserDeliver.controller");
+const DeliverController = require("../controllers/DeliverController");
 
-// router.post("/invoice", DeliverController.createDeliverInvoice);
-// router.put("/invoice", DeliverController.updateDeliverInvoice);
-// router.delete("/invoice/:id", DeliverController.deleteDeliverInvoice);
-
-router.get("/users", UserDeliverController.getUsers);
+// Deprecated: the merged deliver screen uses GET /deliver/recipients. Kept for older
+// web/Electron builds; same handler, so it cannot offer a wider list.
+router.get("/users", DeliverController.getRecipients);
 
 module.exports = router;

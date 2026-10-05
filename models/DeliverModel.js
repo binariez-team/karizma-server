@@ -2,6 +2,7 @@ const pool = require("../config/database");
 // const moment = require("moment");
 const moment = require("moment-timezone");
 const InventoryCosting = require("./InventoryCosting");
+const { AppError } = require("../middleware/errorHandler");
 
 // Migration (run manually):
 // ALTER TABLE deliver_order_items ADD COLUMN avg_cost_usd DECIMAL(10,2) NULL AFTER unit_price;
@@ -27,7 +28,132 @@ function rejectObject(value, field) {
     }
 }
 
+// Who a delivery may be addressed to: another tenant with a live 'user' login, and never
+// the admin's tenant (users can't deliver to the admin). A staff-only or deleted tenant
+// has nobody to approve it, so the sender would be debited for goods nobody receives.
+// One predicate for every caller (the admin's own tenant drops out through `!= caller`),
+// shared by the recipient list and the create/update check so the two cannot drift.
+// Binds the sender's database_id. EXISTS rather than a join, so a tenant with several
+// 'user' rows is listed once. An admin row counts even when deleted: it still marks the
+// admin's tenant.
+const RECIPIENT_WHERE = `d.database_id != ?
+    AND EXISTS (SELECT 1 FROM users u WHERE u.database_id = d.database_id
+        AND u.user_type = 'user' AND u.is_deleted = 0)
+    AND NOT EXISTS (SELECT 1 FROM users a WHERE a.database_id = d.database_id
+        AND a.user_type = 'admin')`;
+
+// Same answer for the admin, the caller itself, an unknown, staff-only or deleted
+// tenant and a malformed id. Not a 400: the edit dialog reads 400 as "already approved"
+// and closes, while this one should stay open to pick another recipient.
+const RECIPIENT_REFUSED = "You can't deliver to this user.";
+
+// The recipient id from the body as a positive integer, or null. Anything else is
+// refused before it is bound: an object would expand into `key` = value SQL.
+function toId(value) {
+    const id =
+        typeof value === "number" || typeof value === "string"
+            ? Number(value)
+            : NaN;
+    return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
 class DeliverInvoice {
+    // GET /deliver/recipients, and the deprecated /deliver/users and /user-deliver/users
+    static async getRecipients(database_id) {
+        const [rows] = await pool.query(
+            `SELECT d.database_id, d.database_name FROM user_database d
+            WHERE ${RECIPIENT_WHERE}
+            ORDER BY d.database_name`,
+            [database_id],
+        );
+        return rows;
+    }
+
+    /**
+     * Refuse a recipient the list above would not offer this sender (403, nothing
+     * written: the transaction rolls back). The list only decides what the screens
+     * offer; this is what stops an old build or a hand-made request from delivering
+     * to the admin.
+     *
+     * Returns the checked id, which the caller writes back to the order so the row
+     * stores exactly what was checked.
+     *
+     * A plain read, not a lock: a recipient whose user is deleted in the same instant
+     * can still slip through. Accepted: locking would need FOR SHARE inside both
+     * subqueries, holding users rows for the length of every create and update.
+     */
+    static async assertRecipient(connection, recipient, database_id) {
+        const id = toId(recipient);
+        if (id) {
+            const [[row]] = await connection.query(
+                `SELECT d.database_id FROM user_database d
+                WHERE d.database_id = ? AND ${RECIPIENT_WHERE}`,
+                [id, database_id],
+            );
+            if (row) return id;
+        }
+        throw new AppError(RECIPIENT_REFUSED, 403);
+    }
+
+    /**
+     * GET /deliver/recipients/:database_id/stock — what the recipient already holds, for
+     * the deliver screen's "their qty" column. [{ product_id, quantity }] only: the
+     * screen has no business with another tenant's prices or costs.
+     *
+     * The id must pass assertRecipient, the same check as delivering to it, so even an
+     * admin can only read tenants it could deliver to (never its own tenant or another
+     * admin's). A malformed id is refused there before any query runs.
+     *
+     * Rows and quantity mirror the recipient's own stock list (UserStockModel.getAll):
+     * one row per product they have a live inventory row for, deleted products left out,
+     * 0 when the row has no transactions. A product missing from the result is therefore
+     * one they don't stock, as opposed to one they stock at 0. I.is_deleted = 0 drops
+     * nothing that list shows (deleting a product flags its inventory rows with it), but
+     * approvePendingInvoice treats a deleted row as absent and opens a new one, so it
+     * keeps such a product from appearing twice. Two live rows for one product (e.g.
+     * two first receipts racing) still come back twice, with the same quantity, as in
+     * that list: consumers key the result by product_id.
+     */
+    static async getRecipientStock(recipient, database_id) {
+        const id = await DeliverInvoice.assertRecipient(
+            pool,
+            recipient,
+            database_id,
+        );
+        const [rows] = await pool.query(
+            `SELECT P.product_id, COALESCE(t.quantity, 0) AS quantity
+            FROM products P
+            INNER JOIN inventory I ON P.product_id = I.product_id_fk AND I.database_id = ?
+            LEFT JOIN (
+                SELECT
+                    product_id_fk,
+                    SUM(CASE WHEN transaction_type = 'ADD' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'REMOVE' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'DELETE' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'SUPPLY' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'RETURN' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'SALE' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'DISPOSE' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'DELIVER' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'REVERSERETURN' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'REVERSEDISPOSE' THEN quantity ELSE 0 END) +
+                    SUM(CASE WHEN transaction_type = 'REVERSEDELIVER' THEN quantity ELSE 0 END) AS quantity
+                FROM inventory_transactions
+                WHERE database_id = ?
+                AND is_deleted = 0
+                GROUP BY product_id_fk
+            ) t ON P.product_id = t.product_id_fk
+            WHERE P.is_deleted = 0 AND I.is_deleted = 0
+            ORDER BY P.product_id ASC`,
+            [id, id],
+        );
+        // mysql2 hands back the SUM (a DECIMAL) as a string
+        return rows.map((r) => ({
+            product_id: r.product_id,
+            quantity: Number(r.quantity),
+        }));
+    }
+
     /**
      * The sender's cost basis for a product at this instant. Falls back to their last
      * known unit cost, then to null — the caller decides what to do with an unpriced
@@ -82,6 +208,13 @@ class DeliverInvoice {
             if (!order || typeof order !== "object" || Array.isArray(order)) {
                 throw new Error("Invalid order");
             }
+
+            // before anything is written: users can't deliver to the admin
+            order.database_id = await DeliverInvoice.assertRecipient(
+                connection,
+                order.database_id,
+                user.database_id,
+            );
 
             moment.tz.setDefault("Asia/Beirut");
             order.order_datetime = moment(order.order_datetime).format(
@@ -213,6 +346,15 @@ class DeliverInvoice {
                 [order.order_id],
             );
             if (!checkPending) throw new Error("approved");
+
+            // an edit can re-point the delivery, so the create rule applies here too,
+            // against the order's stored sender: update() is not tenant-scoped, so the
+            // editor need not be the sender, and the row must never point back at it
+            order.database_id = await DeliverInvoice.assertRecipient(
+                connection,
+                order.database_id,
+                checkPending.admin_id_fk,
+            );
 
             // insert into deliver_orders
             const [result] = await connection.query(

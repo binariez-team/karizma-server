@@ -61,13 +61,13 @@ app.use("/return", auth, ReturnRoutes);
 app.use("/dispose", auth, require("./routes/dispose.routes"));
 app.use("/staff", auth, require("./routes/staff.routes"));
 app.use("/transfer", auth, require("./routes/transfer.routes"));
+app.use("/deliver", auth, DeliverRoutes);
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);
 app.use("/users", admin, UsersRoutes);
 app.use("/suppliers", admin, SuppliersRoutes);
 app.use("/purchase", admin, PurchaseRoutes);
-app.use("/deliver", auth, DeliverRoutes);
 app.use("/admin-history", admin, AdminHistoryRoutes);
 
 // user routes
