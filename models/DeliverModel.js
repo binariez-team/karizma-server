@@ -3,6 +3,7 @@ const pool = require("../config/database");
 const moment = require("moment-timezone");
 const InventoryCosting = require("./InventoryCosting");
 const { AppError } = require("../middleware/errorHandler");
+const { actorId, stampActors } = require("./OrderActors");
 
 // Migration (run manually):
 // ALTER TABLE deliver_order_items ADD COLUMN avg_cost_usd DECIMAL(10,2) NULL AFTER unit_price;
@@ -221,6 +222,8 @@ class DeliverInvoice {
                 `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
             );
             order.admin_id_fk = user.database_id;
+            // prepared by the caller (token), never a body value
+            stampActors(order, actorId(user), null);
 
             // insert into deliver_orders
             const [result] = await connection.query(
@@ -357,13 +360,15 @@ class DeliverInvoice {
             );
 
             // insert into deliver_orders
+            // the editor is the caller (token); created_by_user_id is never touched here
             const [result] = await connection.query(
-                `UPDATE deliver_orders SET order_datetime = ?, total_price = ?, database_id = ?, notes = ? WHERE order_id = ?`,
+                `UPDATE deliver_orders SET order_datetime = ?, total_price = ?, database_id = ?, notes = ?, updated_by_user_id = ? WHERE order_id = ?`,
                 [
                     order.order_datetime,
                     order.total_price,
                     order.database_id,
                     order.notes,
+                    actorId(user),
                     order.order_id,
                 ],
             );

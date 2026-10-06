@@ -1,11 +1,12 @@
 const pool = require("../config/database");
 const Accounts = require("./AccountsModel");
 const Customer = require("./CustomersModel");
+const { stampActors, ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
 const moment = require("moment-timezone");
 
 class SellOrders {
-    // add order
-    static async addOrder(order, items, database_id, payment) {
+    // add order — `user_id` is the caller's users.user_id (token), recorded as the preparer
+    static async addOrder(order, items, database_id, payment, user_id) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -94,6 +95,9 @@ class SellOrders {
                     );
                 }
             }
+
+            // `order` is the request body: the preparer comes from the token only
+            stampActors(order, user_id, null);
 
             const [result] = await connection.query(
                 `INSERT INTO sales_orders SET ?`,
@@ -327,7 +331,8 @@ class SellOrders {
     // `payment` is the tender split for a CASH invoice: { cash_amount, whish_amount }.
     // It is ignored for a debt invoice — a debt sale is settled through its own
     // 'Payment Received' (PAY) vouchers, which this method neither reads nor writes.
-    static async editOrder(order, items, database_id, payment) {
+    // `user_id` is the caller's users.user_id (token), recorded as the last editor.
+    static async editOrder(order, items, database_id, payment, user_id) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -692,6 +697,10 @@ class SellOrders {
                 total_amount: total_amount,
                 total_cost: order.total_cost ?? orderCheck.total_cost,
                 is_deleted: 0,
+                // the row is deleted and re-inserted, so carry the preparer over;
+                // the editor is the caller
+                created_by_user_id: orderCheck.created_by_user_id ?? null,
+                updated_by_user_id: user_id,
             };
 
             // insert query
@@ -891,11 +900,13 @@ class SellOrders {
                 A.address AS customer_address,
                 O.*,
                 DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS},
                 JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
             FROM sales_orders O
             INNER JOIN sales_order_items M ON O.order_id = M.order_id
             INNER JOIN products S ON S.product_id = M.product_id
             LEFT JOIN accounts  A ON O.customer_id = A.account_id
+            ${actorJoins("O")}
             WHERE O.is_deleted = 0 AND O.order_id = ? AND O.database_id = ?
 			GROUP BY O.order_id`,
             [order_id, database_id],

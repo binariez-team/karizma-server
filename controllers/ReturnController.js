@@ -1,4 +1,5 @@
 const ReturnModel = require("../models/ReturnModel");
+const { actorId } = require("../models/OrderActors");
 
 // Every returned line must bring back a positive quantity: the model books it as a
 // RETURN stock movement, so a negative line would REMOVE stock and post a negative
@@ -29,7 +30,8 @@ exports.addReturn = async (req, res, next) => {
             database_id,
             order,
             items,
-            payment
+            payment,
+            actorId(req.user)
         );
         const new_order = await ReturnModel.getAddedOrderById(
             result.order,
@@ -53,7 +55,12 @@ exports.editReturn = async (req, res, next) => {
     const { database_id } = req.user;
 
     try {
-        const result = await ReturnModel.editReturn(database_id, order, items);
+        const result = await ReturnModel.editReturn(
+            database_id,
+            order,
+            items,
+            actorId(req.user)
+        );
         res.status(200).json(result);
     } catch (error) {
         next(error);

@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const moment = require("moment-timezone");
 const Accounts = require("./AccountsModel");
+const { stampActors, ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
 
 // Raw body ids reach `?`, where mysql2 renders a JSON object as SQL: {"is_deleted":0}
 // -> `is_deleted` = 0, which turns e.g. the per-product cost UPDATE into one matching
@@ -102,7 +103,8 @@ class ReturnModel {
         }
     }
 
-    static async addReturn(database_id, order, items, payment) {
+    // `user_id` is the caller's users.user_id (token), recorded as the preparer
+    static async addReturn(database_id, order, items, payment, user_id) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -168,6 +170,8 @@ class ReturnModel {
 
             //add database_id to order
             order.database_id = database_id;
+            // `order` is the request body: the preparer comes from the token only
+            stampActors(order, user_id, null);
 
             //insert order
             const [result] = await connection.query(
@@ -296,8 +300,9 @@ class ReturnModel {
         }
     }
 
-    // edit return
-    static async editReturn(database_id, order, items) {
+    // edit return — `user_id` is the caller's users.user_id (token), recorded as the
+    // last editor
+    static async editReturn(database_id, order, items, user_id) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -444,6 +449,9 @@ class ReturnModel {
 
             //add database_id to order
             order.database_id = database_id;
+            // `order` is the request body and the row was deleted above: carry the
+            // preparer over from the stored row, the editor is the caller
+            stampActors(order, orderCheck.created_by_user_id ?? null, user_id);
 
             // insert query
             const [result] = await connection.query(
@@ -487,11 +495,13 @@ class ReturnModel {
                 A.address AS customer_address,
                 RO.*,
                 DATE(RO.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS},
                 JSON_ARRAYAGG(JSON_OBJECT('order_item_id', M.order_item_id, 'product_id', M.product_id, 'product_name', S.product_name, 'quantity', M.quantity, 'price_type', M.price_type,'unit_cost', M.unit_cost, 'unit_price', M.unit_price, 'total_price', M.total_price)) items
             FROM return_orders RO
             INNER JOIN return_order_items M ON RO.order_id = M.order_id
             INNER JOIN products S ON S.product_id = M.product_id
             INNER JOIN accounts  A ON RO.customer_id = A.account_id
+            ${actorJoins("RO")}
             WHERE RO.is_deleted = 0 AND RO.order_id = ? AND RO.database_id = ?
             GROUP BY RO.order_id`,
             [order_id, database_id],

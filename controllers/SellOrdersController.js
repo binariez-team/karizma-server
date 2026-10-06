@@ -1,4 +1,5 @@
 const SellOrders = require("../models/SellOrdersModel");
+const { actorId } = require("../models/OrderActors");
 
 // Every line of a sale must move a positive quantity. The model
 // books `-quantity` as the SALE stock movement, so a negative line (e.g. a "-2*CODE"
@@ -32,6 +33,7 @@ exports.addOrder = async (req, res, next) => {
             items,
             database_id,
             payment,
+            actorId(req.user),
         );
         const new_order = await SellOrders.getAddedOrderById(
             result.order,
@@ -63,6 +65,7 @@ exports.editOrder = async (req, res, next) => {
             items,
             database_id,
             payment,
+            actorId(req.user),
         );
         const new_order = await SellOrders.getAddedOrderById(
             order_id,

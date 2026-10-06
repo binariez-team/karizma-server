@@ -1,6 +1,7 @@
 const pool = require("../config/database");
 const moment = require("moment-timezone");
 const { invoiceContains } = require("./UserHistoryModel");
+const { ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
 
 class AdminHistory {
     // fetch deliver invoices for admin
@@ -9,9 +10,11 @@ class AdminHistory {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date
+                DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS}
             	FROM deliver_orders O
 				INNER JOIN user_database U ON O.database_id = U.database_id
+				${actorJoins("O")}
 				WHERE O.is_deleted = 0 AND O.admin_id_fk = ?`;
         const params = [database_id];
         // \ % _ match literally: the same partial match as the user deliver lists

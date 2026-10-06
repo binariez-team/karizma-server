@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const moment = require("moment");
+const { ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
 
 // Partial invoice match for all three deliver lists (Sent, Received, admin
 // via AdminHistoryModel), so "5003" still finds 5003. \ % _ in the term are
@@ -16,9 +17,11 @@ class UserHistory {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date
+                DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS}
             	FROM deliver_orders O
                 INNER JOIN user_database U ON O.database_id = U.database_id
+                ${actorJoins("O")}
 				WHERE O.is_deleted = 0
 				AND O.admin_id_fk = ? `;
         const params = [database_id];
@@ -61,9 +64,11 @@ class UserHistory {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date
+                DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS}
             	FROM deliver_orders O
                 INNER JOIN user_database U ON O.admin_id_fk = U.database_id
+                ${actorJoins("O")}
 				WHERE O.is_deleted = 0
                 AND O.is_approved = 1
 				AND O.database_id = ? `;
@@ -124,9 +129,11 @@ class UserHistory {
         let sql = `SELECT
                 O.*,
                 U.database_name AS first_name,
-                DATE(O.order_datetime) AS order_date
+                DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS}
             	FROM deliver_orders O
 				INNER JOIN user_database U ON O.admin_id_fk = U.database_id
+				${actorJoins("O")}
 				WHERE O.is_deleted = 0
 				AND O.is_approved = 0
 				AND O.database_id = ?

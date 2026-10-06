@@ -1,5 +1,6 @@
 const pool = require("../config/database");
 const moment = require("moment-timezone");
+const { ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
 
 class History {
     // get product history
@@ -96,9 +97,11 @@ class History {
                 A.phone AS customer_phone,
                 A.address AS customer_address,
                 O.*,
-                DATE(O.order_datetime) AS order_date
+                DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS}
             FROM sales_orders O
             LEFT JOIN accounts  A ON O.customer_id = A.account_id
+            ${actorJoins("O")}
             WHERE O.is_deleted = 0 AND O.database_id = ? `;
         const params = [database_id];
         if (criteria.invoice_number) {
@@ -237,9 +240,11 @@ class History {
                 A.phone AS customer_phone,
                 A.address AS customer_address,
                 RO.*,
-                DATE(RO.order_datetime) AS order_date
+                DATE(RO.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS}
             FROM return_orders RO
             INNER JOIN accounts  A ON RO.customer_id = A.account_id
+            ${actorJoins("RO")}
             WHERE RO.is_deleted = 0 AND A.database_id = ? `;
         const params = [database_id];
         if (criteria.invoice_number) {
