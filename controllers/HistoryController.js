@@ -1,4 +1,5 @@
 const History = require("../models/HistoryModel");
+const Customer = require("../models/CustomersModel");
 
 const INVALID_ORDER_IDS = { message: "Invalid order ids" };
 // Statements posts one id per statement row (invoices and returns mixed). Far
@@ -23,6 +24,15 @@ const toOrderIds = (body) => {
     return [...ids];
 };
 
+// A route param that must be a positive integer id. Digits only, so "1e3",
+// "0x1f", "1.0", " 7" or "-1" are rejected instead of being coerced by Number().
+// Returns the id, or null when invalid.
+const toParamId = (value) => {
+    if (typeof value !== "string" || !/^[0-9]{1,16}$/.test(value)) return null;
+    const id = Number(value);
+    return Number.isSafeInteger(id) && id >= 1 ? id : null;
+};
+
 // product history
 exports.getProductHistoryById = async (req, res, next) => {
     try {
@@ -33,6 +43,38 @@ exports.getProductHistoryById = async (req, res, next) => {
             database_id,
         );
         res.status(200).send(history);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// a customer's last 5 purchases of one product (sell / return "recent purchases")
+exports.fetchRecentPurchases = async (req, res, next) => {
+    try {
+        const product_id = toParamId(req.params.product_id);
+        const customer_id = toParamId(req.params.customer_id);
+        if (!product_id || !customer_id) {
+            return res
+                .status(400)
+                .json({ message: "Invalid product or customer id" });
+        }
+        const { database_id } = req.user;
+        // Only a live customer of the caller's database. Another database's,
+        // a deleted one, a supplier or an unknown id all get the same 404, so
+        // the endpoint cannot be used to probe account ids.
+        const customer = await Customer.getCustomerByIdAndUserId(
+            database_id,
+            customer_id,
+        );
+        if (!customer) {
+            return res.status(404).send({ message: "Customer not found" });
+        }
+        const rows = await History.fetchRecentPurchases(
+            product_id,
+            customer_id,
+            database_id,
+        );
+        res.status(200).send(rows);
     } catch (error) {
         next(error);
     }

@@ -53,4 +53,18 @@ const actorJoins = (orderAlias) =>
     `LEFT JOIN users PBU ON PBU.user_id = ${orderAlias}.created_by_user_id
             LEFT JOIN users EBU ON EBU.user_id = ${orderAlias}.updated_by_user_id`;
 
-module.exports = { actorId, stampActors, ACTOR_COLUMNS, actorJoins };
+// Who marked a sales invoice reviewed (sales_orders.reviewed_by_user_id, see
+// SellOrdersModel's review section). Same rules as the two above: paired with
+// reviewerJoin() on the same query, only the name leaves the users table.
+const REVIEWER_COLUMN = `${nameOf("RBU")} AS reviewed_by_name`;
+const reviewerJoin = (orderAlias) =>
+    `LEFT JOIN users RBU ON RBU.user_id = ${orderAlias}.reviewed_by_user_id`;
+
+module.exports = {
+    actorId,
+    stampActors,
+    ACTOR_COLUMNS,
+    actorJoins,
+    REVIEWER_COLUMN,
+    reviewerJoin,
+};

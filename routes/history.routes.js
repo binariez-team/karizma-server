@@ -5,6 +5,12 @@ const HistoryController = require("../controllers/HistoryController");
 
 router.get("/product/:id", HistoryController.getProductHistoryById);
 
+// a customer's last 5 purchases of one product, fetched when the overlay opens
+router.get(
+    "/recent/:product_id/:customer_id",
+    HistoryController.fetchRecentPurchases,
+);
+
 router.post("/sales/search", HistoryController.fetchSalesHistory);
 router.post("/sales/details", HistoryController.fetchOrderItemsById);
 router.get("/sales/:order_id/items", HistoryController.fetchSalesOrderItems);

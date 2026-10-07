@@ -62,6 +62,7 @@ app.use("/dispose", auth, require("./routes/dispose.routes"));
 app.use("/staff", auth, require("./routes/staff.routes"));
 app.use("/transfer", auth, require("./routes/transfer.routes"));
 app.use("/deliver", auth, DeliverRoutes);
+app.use("/quotations", auth, require("./routes/quotations.routes"));
 
 // admin routes
 app.use("/admin-stock", admin, AdminStockRoutes);

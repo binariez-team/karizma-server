@@ -59,6 +59,23 @@ const requirePermission = (permission) => async (req, res, next) => {
 	}
 };
 
+// Gate a route on the caller being the OWNER of their database: the admin account
+// or a user account — never one of their staff. Staff share the owner's database_id,
+// so database_id alone cannot tell them apart; user_type (signed into the token) does.
+// Anything else, including a missing or unknown user_type, is refused.
+//
+// Must run after `auth`, which populates req.user.
+const OWNER_TYPES = new Set(["admin", "user"]);
+const requireOwner = (req, res, next) => {
+	if (!OWNER_TYPES.has(req.user?.user_type)) {
+		return res
+			.status(403)
+			.send({ message: "Only the account owner can do this" });
+	}
+	return next();
+};
+
 exports.auth = verifyToken;
 exports.admin = verifyAdmin;
 exports.requirePermission = requirePermission;
+exports.owner = requireOwner;

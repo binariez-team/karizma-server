@@ -147,6 +147,44 @@ class History {
         return (typeof items === "string" ? JSON.parse(items) : items) || [];
     }
 
+    // A customer's latest sales lines of one product, newest first: the "recent
+    // purchases" overlay of the sell / edit-invoice / return screens. Live invoices
+    // and lines of the caller's database only; the caller has already checked that
+    // the customer is this database's. Lines, not invoices: an invoice holding the
+    // product twice gives two rows. order_item_id breaks ties so the order is stable.
+    static async fetchRecentPurchases(product_id, customer_id, database_id) {
+        const sql = `SELECT
+                O.order_id,
+                O.invoice_number,
+                O.order_datetime,
+                I.order_item_id,
+                I.unit_price,
+                I.quantity,
+                I.total_price
+            FROM sales_orders O
+            INNER JOIN sales_order_items I ON I.order_id = O.order_id
+            WHERE O.database_id = ?
+            AND O.customer_id = ?
+            AND O.is_deleted = 0
+            AND I.product_id = ?
+            AND I.is_deleted = 0
+            ORDER BY O.order_datetime DESC, O.order_id DESC, I.order_item_id DESC
+            LIMIT 5`;
+        const [rows] = await pool.query(sql, [
+            database_id,
+            customer_id,
+            product_id,
+        ]);
+        // mysql2 hands DECIMAL columns over as strings; the client formats numbers
+        const num = (value) => (value === null ? null : Number(value));
+        return rows.map((row) => ({
+            ...row,
+            unit_price: num(row.unit_price),
+            quantity: num(row.quantity),
+            total_price: num(row.total_price),
+        }));
+    }
+
     // fetch products sales history
     static async fetchProductsSalesHistory(database_id, criteria) {
         let sql = `SELECT soi.*, p.sku, p.product_name, a.name AS customer_name, so.invoice_number, so.order_datetime 

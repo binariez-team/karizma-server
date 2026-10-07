@@ -1,12 +1,104 @@
 const pool = require("../config/database");
 const Accounts = require("./AccountsModel");
 const Customer = require("./CustomersModel");
-const { stampActors, ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
+const Quotation = require("./QuotationModel");
+const {
+    stampActors,
+    ACTOR_COLUMNS,
+    actorJoins,
+    REVIEWER_COLUMN,
+    reviewerJoin,
+} = require("./OrderActors");
 const moment = require("moment-timezone");
 
+// ##############################################################################################
+// ####################### "needs review" flag on sales invoices ################################
+// Whoever checks out an invoice (admin, user or staff) may tick "Needs review"; the
+// owner of the database (admin or user account, never staff) then sees it in a review
+// queue until they explicitly mark it reviewed. Nothing else about the sale changes:
+// stock, journals, payments, totals and print are exactly those of an unflagged sale.
+//
+// Migration (run manually, BEFORE deploying the server that writes these columns):
+// ALTER TABLE sales_orders
+//     ADD COLUMN needs_review TINYINT(1) NOT NULL DEFAULT 0,
+//     ADD COLUMN reviewed_by_user_id INT NULL DEFAULT NULL,
+//     ADD COLUMN reviewed_at DATETIME NULL DEFAULT NULL,
+//     ADD INDEX idx_sales_orders_review (database_id, needs_review, reviewed_at);
+//
+// - pending  = needs_review = 1 AND reviewed_at IS NULL (AND is_deleted = 0)
+// - reviewed = needs_review = 1 AND reviewed_at IS NOT NULL; needs_review stays 1, so
+//   the invoice keeps saying it was flagged, and by whom/when it was cleared.
+// - needs_review is set on create only. reviewed_by_user_id/reviewed_at are written
+//   only by markReviewed (owner, token user_id). An edit (editOrder deletes and
+//   re-inserts the row) carries all three over from the stored row — editing alone
+//   never clears a review, and the edit body cannot set them.
+// - reviewed_by_user_id holds users.user_id; no FK (users are soft-deleted), like the
+//   created_by/updated_by columns in OrderActors.
+// - Existing rows get needs_review = 0: nothing old shows up in the queue.
+
+const REVIEW_COLUMNS = new Set([
+    "needs_review",
+    "reviewed_by_user_id",
+    "reviewed_at",
+]);
+
+// Stamp the review columns on a checkout row built from the request body, before
+// its `SET ?` INSERT (same reasoning as OrderActors.stampActors). Body keys MySQL
+// would resolve to one of these columns are dropped first: column names are
+// case-insensitive, and mysql2 renders a dotted key as a qualified name
+// (`sales_orders`.`reviewed_at`). All three are then set explicitly, so any other
+// spelling that still reaches MySQL fails the INSERT as "specified twice" (and the
+// whole checkout rolls back) instead of overriding the value.
+const stampReview = (order, needs_review) => {
+    for (const key of Object.keys(order)) {
+        const column = key.split(".").pop().toLowerCase();
+        if (REVIEW_COLUMNS.has(column)) delete order[key];
+    }
+    order.needs_review = needs_review === true ? 1 : 0;
+    order.reviewed_by_user_id = null;
+    order.reviewed_at = null;
+    return order;
+};
+
+// The review queue lists at most this many reviewed invoices (newest review first);
+// the pending ones are always listed in full.
+const REVIEWED_LIMIT = 100;
+
+// Header columns of a review-queue row: exactly a sales history row
+// (HistoryModel.fetchSalesHistory) plus the reviewer's name, so the history
+// screens' details/edit/print work on it unchanged.
+const REVIEW_ROW_SELECT = `SELECT
+                A.name AS customer_name,
+                A.phone AS customer_phone,
+                A.address AS customer_address,
+                O.*,
+                DATE(O.order_datetime) AS order_date,
+                ${ACTOR_COLUMNS},
+                ${REVIEWER_COLUMN}
+            FROM sales_orders O
+            LEFT JOIN accounts  A ON O.customer_id = A.account_id
+            ${actorJoins("O")}
+            ${reviewerJoin("O")}
+            WHERE O.database_id = ? AND O.needs_review = 1 AND O.is_deleted = 0`;
+
+const reviewNow = () =>
+    moment().tz("Asia/Beirut").format("YYYY-MM-DD HH:mm:ss");
+
 class SellOrders {
-    // add order — `user_id` is the caller's users.user_id (token), recorded as the preparer
-    static async addOrder(order, items, database_id, payment, user_id) {
+    // add order — `user_id` is the caller's users.user_id (token), recorded as the preparer.
+    // `quotation_id` (optional, unvalidated body value): the saved quotation this invoice
+    // was converted from; it is marked converted in this transaction, or ignored.
+    // `needs_review` (boolean, validated by the controller): flag the invoice for the
+    // owner's review. Only `true` flags it.
+    static async addOrder(
+        order,
+        items,
+        database_id,
+        payment,
+        user_id,
+        quotation_id = null,
+        needs_review = false,
+    ) {
         const connection = await pool.getConnection();
         try {
             await connection.beginTransaction();
@@ -96,8 +188,10 @@ class SellOrders {
                 }
             }
 
-            // `order` is the request body: the preparer comes from the token only
+            // `order` is the request body: the preparer comes from the token only,
+            // the review flag from the validated `needs_review` argument only
             stampActors(order, user_id, null);
+            stampReview(order, needs_review);
 
             const [result] = await connection.query(
                 `INSERT INTO sales_orders SET ?`,
@@ -317,8 +411,24 @@ class SellOrders {
                 }
             }
 
+            // No query at all without a quotation, so a plain checkout is unchanged.
+            // markConverted never fails the sale for a bad/foreign/used quotation.
+            let quotation_converted = false;
+            if (quotation_id !== null && quotation_id !== undefined) {
+                quotation_converted = await Quotation.markConverted(
+                    connection,
+                    quotation_id,
+                    order_id,
+                    database_id,
+                );
+            }
+
             await connection.commit();
-            return { order: order_id, payment: journal_voucher.insertId };
+            return {
+                order: order_id,
+                payment: journal_voucher.insertId,
+                quotation_converted,
+            };
         } catch (error) {
             await connection.rollback();
             throw error;
@@ -701,6 +811,11 @@ class SellOrders {
                 // the editor is the caller
                 created_by_user_id: orderCheck.created_by_user_id ?? null,
                 updated_by_user_id: user_id,
+                // and the review state, untouched: an edit neither flags nor clears
+                // (the pool reads TINYINT(1) as a boolean, hence the explicit 1/0)
+                needs_review: orderCheck.needs_review ? 1 : 0,
+                reviewed_by_user_id: orderCheck.reviewed_by_user_id ?? null,
+                reviewed_at: orderCheck.reviewed_at ?? null,
             };
 
             // insert query
@@ -948,6 +1063,76 @@ class SellOrders {
             cash_amount: find("531"),
             whish_amount: find("532"),
         };
+    }
+
+    // ############################ review queue (owner only) ###################################
+    // The controller has already checked the caller is the owner (admin/user) of
+    // `database_id`; everything below is scoped to it and to live invoices.
+
+    // number of flagged invoices still waiting for review — the navbar badge
+    static async countPendingReview(database_id) {
+        const [[row]] = await pool.query(
+            `SELECT COUNT(*) AS count FROM sales_orders
+            WHERE database_id = ? AND needs_review = 1 AND reviewed_at IS NULL AND is_deleted = 0`,
+            [database_id],
+        );
+        return Number(row?.count) || 0;
+    }
+
+    // `status`: 'pending' — every flagged invoice not yet reviewed, newest sale first;
+    // 'reviewed' — the REVIEWED_LIMIT most recently reviewed, newest review first;
+    // 'all' — the pending ones followed by the reviewed ones.
+    static async searchReview(database_id, status) {
+        const rows = [];
+        if (status === "pending" || status === "all") {
+            const [pending] = await pool.query(
+                `${REVIEW_ROW_SELECT}
+                AND O.reviewed_at IS NULL
+                ORDER BY O.order_datetime DESC, O.order_id DESC`,
+                [database_id],
+            );
+            rows.push(...pending);
+        }
+        if (status === "reviewed" || status === "all") {
+            const [reviewed] = await pool.query(
+                `${REVIEW_ROW_SELECT}
+                AND O.reviewed_at IS NOT NULL
+                ORDER BY O.reviewed_at DESC, O.order_id DESC
+                LIMIT ?`,
+                [database_id, REVIEWED_LIMIT],
+            );
+            rows.push(...reviewed);
+        }
+        return rows;
+    }
+
+    // one flagged, live invoice of this database as a review-queue row, or undefined
+    static async getReviewRow(order_id, database_id) {
+        const [[row]] = await pool.query(
+            `${REVIEW_ROW_SELECT}
+            AND O.order_id = ?`,
+            [database_id, order_id],
+        );
+        return row;
+    }
+
+    // Mark a flagged invoice reviewed by `user_id` (the owner, from the token), now.
+    // Idempotent: an invoice that is already reviewed keeps its first reviewer and
+    // time, and comes back with already_reviewed = true. The `reviewed_at IS NULL`
+    // guard makes two concurrent calls safe — exactly one of them writes.
+    // Returns the review-queue row + { already_reviewed }, or null when there is no
+    // such flagged, live invoice in this database (unknown id, another database's,
+    // deleted, or never flagged).
+    static async markReviewed(order_id, database_id, user_id) {
+        const [result] = await pool.query(
+            `UPDATE sales_orders SET reviewed_by_user_id = ?, reviewed_at = ?
+            WHERE order_id = ? AND database_id = ? AND needs_review = 1
+            AND reviewed_at IS NULL AND is_deleted = 0`,
+            [user_id, reviewNow(), order_id, database_id],
+        );
+        const row = await SellOrders.getReviewRow(order_id, database_id);
+        if (!row) return null;
+        return { ...row, already_reviewed: result.affectedRows !== 1 };
     }
 }
 
