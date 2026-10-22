@@ -1,5 +1,18 @@
 const jwt = require("jsonwebtoken");
 const pool = require("../config/database");
+const { ACCESS_SECRET } = require("../config/jwt");
+
+// The claims every login token carries (AuthController.login, and the profile re-sign
+// since its fix): a plain user_id and database_id and a known user_type. Tokens never
+// expire, and the profile screen used to re-sign WITHOUT database_id: such a token
+// would write sales, payments and expenses with a NULL tenant. It is sent back to the
+// login screen with the answer the reports gate gives (models/reports-v2/errors.js).
+const isId = (v) =>
+	(typeof v === "number" || (typeof v === "string" && /^\d+$/.test(v))) &&
+	Number.isSafeInteger(Number(v)) &&
+	Number(v) > 0;
+const USER_TYPES = new Set(["admin", "user", "staff"]);
+const RELOGIN = { code: "RELOGIN", message: "Please log in again." };
 
 const verifyToken = (req, res, next) => {
 	const token =
@@ -11,11 +24,19 @@ const verifyToken = (req, res, next) => {
 	try {
 		const decoded = jwt.verify(
 			token,
-			"$3a#_cJDUV-$QsRewWXcyH-Xdji8#%^$*(_ZkfNdI@#!D-Nv0E_M3a"
+			ACCESS_SECRET
 		);
 		req.user = decoded;
 	} catch (err) {
 		return res.status(401).send("Invalid Token");
+	}
+	const user = req.user || {};
+	if (
+		!isId(user.user_id) ||
+		!isId(user.database_id) ||
+		!USER_TYPES.has(user.user_type)
+	) {
+		return res.status(401).send(RELOGIN);
 	}
 	return next();
 };

@@ -96,9 +96,12 @@ class Transfer {
     }
 
     // get accounts suitable for transfer
+    // Any logged-in user or staff gets every other tenant here, so only what the
+    // dialog's Receiver dropdown reads (database_id, full_name) is selected: a d.*
+    // would also serve each tenant's user_database settings (profit share, assets cap).
     static async getTransferAccounts(database_id) {
         const query = `SELECT 
-        d.*,
+        d.database_id,
         CONCAT(u.first_name, ' ', u.last_name) AS full_name
         FROM user_database d
         INNER JOIN users u ON d.database_id = u.database_id

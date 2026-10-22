@@ -1,4 +1,8 @@
+const pool = require("../config/database");
 const DeliverInvoice = require("../models/DeliverModel");
+const access = require("../models/reports-v2/access");
+const { ReportError, sendReportError } = require("../models/reports-v2/errors");
+const { parseCapCheckBody, getCapCheck } = require("../models/reports-v2/deliverCap");
 
 // GET /deliver/recipients — { database_id, database_name } rows, the same for every
 // role. Also answers the deprecated /deliver/users and /user-deliver/users, so older
@@ -35,6 +39,40 @@ exports.getRecipientStock = async (req, res, next) => {
         );
         res.status(200).send(stock);
     } catch (error) {
+        next(error);
+    }
+};
+
+// POST /deliver/cap-check — the recipient's assets-cap use now and after the draft
+// delivery (plan §8 Phase 7 item 3, Phase 7.1 PA14): { database_id, items: [{
+// product_id, quantity }], order_id? } → the figures of models/reports-v2/deliverCap.js.
+// Non-blocking, and the admin sender only (owner answer 2026-10-22): users and staff
+// never see another shop's cap. The token's role is checked before any SQL, then the
+// live login (401 when it no longer matches the token) and the same recipient rule as
+// delivering (403 "You can't deliver to this user.").
+exports.capCheck = async (req, res, next) => {
+    try {
+        if (req.user?.user_type !== "admin") {
+            return res
+                .status(403)
+                .send({ message: "You don't have permission to do this" });
+        }
+        const viewer = await access.loadViewer(req);
+        if (!viewer.isAdmin) {
+            return res
+                .status(403)
+                .send({ message: "You don't have permission to do this" });
+        }
+        const params = parseCapCheckBody(req.body);
+        params.receiver = await DeliverInvoice.assertRecipient(
+            pool,
+            params.receiver,
+            viewer.databaseId,
+        );
+        const result = await getCapCheck(params, viewer.databaseId);
+        res.status(200).send(result);
+    } catch (error) {
+        if (error instanceof ReportError) return sendReportError(res, error);
         next(error);
     }
 };

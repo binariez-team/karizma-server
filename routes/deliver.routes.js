@@ -10,6 +10,8 @@ router.get(
 );
 // deprecated alias for builds that predate /recipients
 router.get("/users", DeliverController.getRecipients);
+// the recipient's cap use before / after the draft (admin sender only, non-blocking)
+router.post("/cap-check", DeliverController.capCheck);
 router.post("/invoice", DeliverController.createDeliverInvoice);
 router.put("/invoice", DeliverController.updateDeliverInvoice);
 router.delete("/invoice/:id", DeliverController.deleteDeliverInvoice);

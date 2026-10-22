@@ -30,10 +30,14 @@ const checkPaymentBody = (paymentData, { moneyAccount }) => {
     paymentData.amount = amount;
 
     if (moneyAccount) {
-        if (!isScalar(paymentData.money_account)) {
+        // Cash or Whish only (the payment dialog's two options)
+        const account = isScalar(paymentData.money_account)
+            ? String(paymentData.money_account)
+            : null;
+        if (!Payment.MONEY_ACCOUNTS.includes(account)) {
             return "Invalid money account";
         }
-        paymentData.money_account = String(paymentData.money_account);
+        paymentData.money_account = account;
     }
 
     const { reference_number } = paymentData;

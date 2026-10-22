@@ -41,7 +41,8 @@ exports.createSupplier = async (req, res) => {
 };
 
 // update supplier
-exports.updateSupplier = async (req, res) => {
+// Errors go to the error handler, so a malformed id is answered 404 (not 500).
+exports.updateSupplier = async (req, res, next) => {
     const id = req.params.id;
     const data = req.body;
     try {
@@ -53,19 +54,21 @@ exports.updateSupplier = async (req, res) => {
             supplier,
         });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 
 // delete supplier
-exports.deleteSupplier = async (req, res) => {
+// 409 while the balance is not zero, 404 for an id that is not a live supplier; the
+// error handler sends their message for the client's toast.
+exports.deleteSupplier = async (req, res, next) => {
     const id = req.params.id;
     try {
         const { database_id } = req.user;
         const result = await Supplier.deleteSupplier(id, database_id);
         res.status(201).json({ message: "Supplier deleted successfully" });
     } catch (error) {
-        res.status(500).json({ message: error.message });
+        next(error);
     }
 };
 

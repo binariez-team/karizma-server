@@ -14,21 +14,6 @@ const { actorId, stampActors } = require("./OrderActors");
 // NULL on rows created before the column existed; approvePendingInvoice falls back to
 // the sender's live average for those.
 
-// order_id, invoice_number and product_id come from the request body and are bound to
-// `?`, where mysql2 expands a plain object into `key` = value pairs: {"is_deleted":0}
-// would turn update()'s `WHERE order_id = ?` into a predicate matching every tenant's
-// rows. The old interpolated INSERT broke on objects ([object Object]) and rolled the
-// transaction back whenever there were items; refusing them up front keeps that outcome
-// and also covers an empty items list. Arrays render as a plain list (never an
-// identifier) and are left as they were. The same expansion inside update()'s
-// `SET ... notes = ?` would append arbitrary column assignments (is_approved,
-// admin_id_fk, ...) to the row, so total_price, database_id and notes are refused too.
-function rejectObject(value, field) {
-    if (value !== null && typeof value === "object" && !Array.isArray(value)) {
-        throw new Error(`Invalid ${field}`);
-    }
-}
-
 // Who a delivery may be addressed to: another tenant with a live 'user' login, and never
 // the admin's tenant (users can't deliver to the admin). A staff-only or deleted tenant
 // has nobody to approve it, so the sender would be debited for goods nobody receives.
@@ -48,14 +33,91 @@ const RECIPIENT_WHERE = `d.database_id != ?
 // and closes, while this one should stay open to pick another recipient.
 const RECIPIENT_REFUSED = "You can't deliver to this user.";
 
-// The recipient id from the body as a positive integer, or null. Anything else is
-// refused before it is bound: an object would expand into `key` = value SQL.
+// A positive integer from the body (an id, or a line's quantity), or null. Anything
+// else is refused before it is bound: an object would expand into `key` = value SQL.
 function toId(value) {
     const id =
         typeof value === "number" || typeof value === "string"
             ? Number(value)
             : NaN;
     return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+// What a delivery takes from the request body, and nothing else. The order row and
+// every line used to be the body objects themselves, bound to `INSERT ... SET ?`, so a
+// sender could write any column: is_approved = 1 (or is_deleted = 1) on the order
+// debited them for goods the receiver was never asked to approve, is_deleted on a line
+// hid it the same way, and order_id / record_id picked the primary key (one near the
+// INT maximum stops every later insert, any tenant's). Rows are now built from the
+// checked values below, and the rest of each row is the server's; unknown keys are
+// left out. No body value is bound unchecked: mysql2 expands an object bound to `?`
+// into `key` = value pairs, so {"is_deleted":0} would turn `WHERE order_id = ?` into a
+// predicate matching every tenant's rows, and inside a SET would add assignments.
+// Each check throws, so the transaction rolls back with nothing written.
+
+// A DECIMAL from the body (total_price, unit_price): a finite number, or a plain
+// decimal string, as mysql2 hands DECIMALs back (the edit dialog can send a total it
+// never recomputed). Returned as sent, so a valid body binds what it always did.
+function toAmount(value, field) {
+    const valid =
+        typeof value === "number"
+            ? Number.isFinite(value)
+            : typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value);
+    if (!valid) throw new Error(`Invalid ${field}`);
+    return value;
+}
+
+// order_datetime as stored: the date the body picked, at the current Beirut time. A
+// string moment can't read used to reach the SQL as "Invalid date" and fail there.
+function toOrderDatetime(value) {
+    moment.tz.setDefault("Asia/Beirut");
+    const date = typeof value === "string" ? moment(value) : null;
+    if (!date?.isValid()) throw new Error("Invalid order_datetime");
+    return date.format(`YYYY-MM-DD ${moment().format("HH:mm:ss")}`);
+}
+
+// deliver_orders.notes is VARCHAR(255) utf8mb4: null, or a string of at most 255
+// characters (code points, as MySQL counts them).
+function toNotes(value) {
+    if (value === undefined || value === null) return null;
+    if (typeof value !== "string" || Array.from(value).length > 255) {
+        throw new Error("Invalid notes");
+    }
+    return value;
+}
+
+// The checked values as a row for `SET ?`, in the order the body sent its keys, so a
+// valid body binds exactly what it did when it was the row itself. A key the body
+// didn't send stays out, and its column keeps its default, as before.
+function inBodyOrder(body, checked) {
+    return Object.fromEntries(
+        Object.keys(body)
+            .filter((key) => Object.prototype.hasOwnProperty.call(checked, key))
+            .map((key) => [key, checked[key]]),
+    );
+}
+
+// One deliver_order_items row from a body line: product_id, quantity and unit_price,
+// plus the line's own record_id when `reusable` (update() only) still holds it, each
+// at most once. Whole units, at least 1: the screens send no less, and a negative line
+// would credit the sender with stock that approval then skips. The caller adds
+// order_id_fk and avg_cost_usd.
+function lineOf(record, reusable) {
+    if (!record || typeof record !== "object" || Array.isArray(record)) {
+        throw new Error("Invalid item");
+    }
+    const product_id = toId(record.product_id);
+    if (!product_id) throw new Error("Invalid product_id");
+    const quantity = toId(record.quantity);
+    if (!quantity) throw new Error("Invalid quantity");
+    const checked = {
+        product_id,
+        quantity,
+        unit_price: toAmount(record.unit_price, "unit_price"),
+    };
+    const record_id = toId(record.record_id);
+    if (record_id && reusable?.delete(record_id)) checked.record_id = record_id;
+    return inBodyOrder(record, checked);
 }
 
 class DeliverInvoice {
@@ -76,8 +138,8 @@ class DeliverInvoice {
      * offer; this is what stops an old build or a hand-made request from delivering
      * to the admin.
      *
-     * Returns the checked id, which the caller writes back to the order so the row
-     * stores exactly what was checked.
+     * Returns the checked id, which the caller writes to the row so it stores exactly
+     * what was checked.
      *
      * A plain read, not a lock: a recipient whose user is deleted in the same instant
      * can still slip through. Accepted: locking would need FOR SHARE inside both
@@ -203,32 +265,40 @@ class DeliverInvoice {
         try {
             await connection.beginTransaction();
 
-            // `order` is the values argument of `SET ?` below. Sent as an array, mysql2
-            // binds order[0] straight from the body, so the admin_id_fk override (set on
-            // the array, not the element) never reaches the INSERT.
+            // read field by field, never bound as they are (see toId and below)
             if (!order || typeof order !== "object" || Array.isArray(order)) {
                 throw new Error("Invalid order");
             }
+            if (!Array.isArray(items)) throw new Error("Invalid items");
+            const order_datetime = toOrderDatetime(order.order_datetime);
+            const total_price = toAmount(order.total_price, "total_price");
+            const notes = toNotes(order.notes);
 
-            // before anything is written: users can't deliver to the admin
+            // before anything is written: users can't deliver to the admin. Written
+            // back to the body too, for the controller's deliverAdded event.
             order.database_id = await DeliverInvoice.assertRecipient(
                 connection,
                 order.database_id,
                 user.database_id,
             );
 
-            moment.tz.setDefault("Asia/Beirut");
-            order.order_datetime = moment(order.order_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
-            );
-            order.admin_id_fk = user.database_id;
+            // These four from the body, the rest the server's: the sender is the
+            // caller, invoice_number is set below, is_approved / approved_at /
+            // is_deleted keep their defaults (pending, live).
+            const row = inBodyOrder(order, {
+                database_id: order.database_id,
+                order_datetime,
+                total_price,
+                notes,
+            });
+            row.admin_id_fk = user.database_id;
             // prepared by the caller (token), never a body value
-            stampActors(order, actorId(user), null);
+            stampActors(row, actorId(user), null);
 
             // insert into deliver_orders
             const [result] = await connection.query(
                 `INSERT INTO deliver_orders SET ?`,
-                [order],
+                [row],
             );
 
             // inserted order ID
@@ -249,10 +319,7 @@ class DeliverInvoice {
             //	********************************
 
             for (const record of items) {
-                const productName = record.product_name;
-                delete record.product_name;
-                delete record.stock;
-                rejectObject(record.product_id, "product_id");
+                const line = lineOf(record);
 
                 // Snapshot the sender's cost as the goods leave, and refuse the dispatch
                 // outright if there is no cost to snapshot. Pinning it here means the
@@ -261,16 +328,16 @@ class DeliverInvoice {
                 // finally approved.
                 const senderCost = await DeliverInvoice.assertSenderCost(
                     connection,
-                    order.admin_id_fk,
-                    record.product_id,
-                    productName,
+                    user.database_id,
+                    line.product_id,
+                    record.product_name,
                 );
 
                 // insert into order items
                 await connection.query(
                     `INSERT INTO deliver_order_items SET ?`,
                     {
-                        ...record,
+                        ...line,
                         order_id_fk: order_id,
                         avg_cost_usd: senderCost,
                     },
@@ -278,13 +345,13 @@ class DeliverInvoice {
 
                 // add record to inventory transactions
                 // parameterized: values were interpolated into SQL with multipleStatements on
-                // (record.product_id comes straight from the request body)
+                // (the line's values come from the request body, checked by lineOf)
                 await connection.query(
                     `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (?, ?, ?, 'DELIVER', ?, ?);`,
                     [
-                        record.product_id,
-                        order.admin_id_fk,
-                        -record.quantity,
+                        line.product_id,
+                        user.database_id,
+                        -line.quantity,
                         invoice_number,
                         order_id,
                     ],
@@ -333,27 +400,35 @@ class DeliverInvoice {
         try {
             await connection.beginTransaction();
 
-            moment.tz.setDefault("Asia/Beirut");
-            order.order_datetime = moment(order.order_datetime).format(
-                `YYYY-MM-DD ${moment().format("HH:mm:ss")}`,
-            );
-            order.admin_id_fk = user.database_id;
-            rejectObject(order.order_id, "order_id");
-            rejectObject(order.invoice_number, "invoice_number");
-            rejectObject(order.total_price, "total_price");
-            rejectObject(order.database_id, "database_id");
-            rejectObject(order.notes, "notes");
+            // read field by field, as in create(); the UPDATE below names its columns,
+            // so is_approved, approved_at, admin_id_fk and created_by_user_id are never
+            // the body's to change, and invoice_number is read from the stored row
+            if (!order || typeof order !== "object" || Array.isArray(order)) {
+                throw new Error("Invalid order");
+            }
+            if (!Array.isArray(items)) throw new Error("Invalid items");
+            // a malformed id gets the same answer as an unknown one
+            const order_id = toId(order.order_id);
+            if (!order_id) throw new Error("approved");
+            const order_datetime = toOrderDatetime(order.order_datetime);
+            const total_price = toAmount(order.total_price, "total_price");
+            const notes = toNotes(order.notes);
 
+            // only the caller's own (admin_id_fk, as in delete()), live, pending order:
+            // looked up by order_id alone, any login of any tenant (staff included) could
+            // rewrite another tenant's pending delivery. Another tenant's, a deleted or an
+            // unknown order all get the same "approved" answer; the edit dialog only
+            // opens the caller's own live sends
             let [[checkPending]] = await connection.query(
-                `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0`,
-                [order.order_id],
+                `SELECT * FROM deliver_orders WHERE order_id = ? AND is_approved = 0 AND is_deleted = 0 AND admin_id_fk = ?`,
+                [order_id, user.database_id],
             );
             if (!checkPending) throw new Error("approved");
 
             // an edit can re-point the delivery, so the create rule applies here too,
-            // against the order's stored sender: update() is not tenant-scoped, so the
-            // editor need not be the sender, and the row must never point back at it
-            order.database_id = await DeliverInvoice.assertRecipient(
+            // against the order's stored sender (the caller's tenant, per the lookup
+            // above): the row must never point back at it
+            const database_id = await DeliverInvoice.assertRecipient(
                 connection,
                 order.database_id,
                 checkPending.admin_id_fk,
@@ -364,12 +439,12 @@ class DeliverInvoice {
             const [result] = await connection.query(
                 `UPDATE deliver_orders SET order_datetime = ?, total_price = ?, database_id = ?, notes = ?, updated_by_user_id = ? WHERE order_id = ?`,
                 [
-                    order.order_datetime,
-                    order.total_price,
-                    order.database_id,
-                    order.notes,
+                    order_datetime,
+                    total_price,
+                    database_id,
+                    notes,
                     actorId(user),
-                    order.order_id,
+                    order_id,
                 ],
             );
 
@@ -385,9 +460,9 @@ class DeliverInvoice {
             // and are skipped by applyValue — for those the quantity still returns and
             // the value still moves at today's average, exactly as it did before.
             const [oldLines] = await connection.query(
-                `SELECT product_id, quantity, avg_cost_usd
+                `SELECT record_id, product_id, quantity, avg_cost_usd
 				FROM deliver_order_items WHERE order_id_fk = ? AND is_deleted = 0`,
-                [order.order_id],
+                [order_id],
             );
             await InventoryCosting.applyValue(
                 connection,
@@ -399,16 +474,19 @@ class DeliverInvoice {
                 })),
                 1,
             );
+            // the edit dialog sends each line it loaded back with its record_id, and
+            // the line is re-inserted under it; any other id is dropped (see lineOf)
+            const reusable = new Set(oldLines.map((l) => l.record_id));
 
             await connection.query(
                 `DELETE FROM inventory_transactions WHERE transaction_type = 'DELIVER' AND order_id_fk = ? AND database_id = ?`,
-                [order.order_id, user.database_id],
+                [order_id, user.database_id],
             );
 
             //delete invoice items
             await connection.query(
                 `DELETE FROM deliver_order_items WHERE order_id_fk = ?`,
-                [order.order_id],
+                [order_id],
             );
 
             //	********************************
@@ -416,41 +494,39 @@ class DeliverInvoice {
             //	********************************
 
             for (const record of items) {
-                const productName = record.product_name;
-                delete record.product_name;
-                delete record.stock;
-                rejectObject(record.product_id, "product_id");
+                const line = lineOf(record, reusable);
 
                 // re-snapshot on edit — the line may now be a different product or
                 // quantity, and the order is still pending so nothing has been received
                 const senderCost = await DeliverInvoice.assertSenderCost(
                     connection,
-                    order.admin_id_fk,
-                    record.product_id,
-                    productName,
+                    user.database_id,
+                    line.product_id,
+                    record.product_name,
                 );
 
                 // insert into order items
                 await connection.query(
                     `INSERT INTO deliver_order_items SET ?`,
                     {
-                        ...record,
+                        ...line,
                         avg_cost_usd: senderCost,
-                        order_id_fk: order.order_id,
+                        order_id_fk: order_id,
                     },
                 );
 
                 // add admin record to inventory transactions
                 // parameterized: values were interpolated into SQL with multipleStatements on
-                // (order.invoice_number, order.order_id and record.product_id come from the body)
+                // (the line's values come from the body, checked by lineOf; the invoice
+                // number is the stored one, never the body's)
                 await connection.query(
                     `INSERT INTO inventory_transactions (product_id_fk, database_id, quantity, transaction_type, transaction_notes, order_id_fk) VALUES (?, ?, ?, 'DELIVER', ?, ?);`,
                     [
-                        record.product_id,
-                        order.admin_id_fk,
-                        -record.quantity,
-                        order.invoice_number,
-                        order.order_id,
+                        line.product_id,
+                        user.database_id,
+                        -line.quantity,
+                        checkPending.invoice_number,
+                        order_id,
                     ],
                 );
             }

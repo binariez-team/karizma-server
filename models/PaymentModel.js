@@ -7,6 +7,11 @@ class Payment {
     static CUSTOMER_PAYMENT = "Payment Received";
     static SUPPLIER_PAYMENT = "Supplier Payment";
 
+    // The accounts a customer payment can be received into (as Expense/Transfer). Any
+    // other chart account would book Dr <it> / Cr 413: e.g. 108 Partner Drawings, which
+    // would count as a share taken with no approval (reports-v2 M32).
+    static MONEY_ACCOUNTS = ["531", "532"];
+
     // The journal_number prefix every creator of each kind stamps: 'Payment Received'
     // is only created as PAY#### (here and SellOrdersModel.addOrder), 'Supplier
     // Payment' only as REC#### (here and PurchaseModel). Free-text vouchers can carry

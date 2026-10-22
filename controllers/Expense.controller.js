@@ -32,7 +32,13 @@ const MAX_CENTS = 9999999999;
 // Payment', statements branch on 'Invoice' / 'Return' / 'Manual Transaction' /
 // 'Supply', the transfer history filters on 'Transfer', and the statements add a
 // synthetic 'Initial Balance' row. An expense carrying one of them would be counted,
-// listed or handled as that kind of voucher.
+// listed or handled as that kind of voucher. 'Share Taken' / 'Share Taken Reversal'
+// label the partner-share vouchers (Phase 7.1, PartnerShareModel), which Cash history
+// lists by that label: an expense must not pass for a share. The next six label the
+// admin's cash corrections with reasons (BalanceModel.CORRECTION_REASONS, 2026-10-22):
+// an expense must not pass for a capital entry, a drawing, an unknown loss or gain, or
+// money moved to or from the safe. 'Opening Safe Balance' labels the admin's one opening
+// entry of cash outside the till (BalanceModel.SAFE_OPENING, owner answer F2).
 const RESERVED_DESCRIPTIONS = [
     "Payment Received",
     "Supplier Payment",
@@ -44,6 +50,15 @@ const RESERVED_DESCRIPTIONS = [
     "Self Transfer",
     "Manual Transaction",
     "Initial Balance",
+    "Share Taken",
+    "Share Taken Reversal",
+    "Capital Added",
+    "Owner Drawings",
+    "Unknown Cash Loss",
+    "Unknown Cash Gain",
+    "Moved to Safe",
+    "Back from Safe",
+    "Opening Safe Balance",
 ];
 
 // Latin letters with a stroke or bar. NFKD keeps them whole, but Unicode collation
@@ -85,6 +100,10 @@ const reservedLabelOf = (description) => {
         )?.[1]
     );
 };
+// The same check refuses a legacy cash correction's note (old builds, and an edit that
+// keeps an old correction), which becomes the voucher's description (BalanceController,
+// owner answer F3, 2026-10-22)
+exports.reservedLabelOf = reservedLabelOf;
 
 // Normalizes the expense body in place; returns an error message, or null when it
 // is valid.

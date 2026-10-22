@@ -1,6 +1,30 @@
 const pool = require("../config/database");
 const moment = require("moment");
+const momentTz = require("moment-timezone");
 const { ACTOR_COLUMNS, actorJoins } = require("./OrderActors");
+
+// deliver_orders.approved_at (reports plan §7.2) is a manual migration, so it is only
+// written once the column exists: an early deploy must never break approvals. The check
+// runs on the first approval (not at load, so the model loads without a query) and its
+// answer is kept for the life of the process; a failed check is not kept and is retried.
+let approvedAtCheck = null;
+const hasApprovedAt = () => {
+    if (!approvedAtCheck) {
+        approvedAtCheck = pool
+            .query(
+                `/* rk:approve.has_approved_at */ SELECT 1 FROM information_schema.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'deliver_orders'
+                AND COLUMN_NAME = 'approved_at'`,
+            )
+            .then(([rows]) => rows.length > 0)
+            .catch((error) => {
+                approvedAtCheck = null;
+                console.error("approved_at column check failed:", error.message);
+                return false;
+            });
+    }
+    return approvedAtCheck;
+};
 
 // Partial invoice match for all three deliver lists (Sent, Received, admin
 // via AdminHistoryModel), so "5003" still finds 5003. \ % _ in the term are
@@ -175,6 +199,7 @@ class UserHistory {
     // The sending tenant (`admin_id`) is read off the order, never accepted from the
     // caller — it selects whose inventory the opening cost basis is copied from.
     static async approvePendingInvoice(id, database_id) {
+        const withApprovedAt = await hasApprovedAt();
         const connection = await pool.getConnection();
 
         try {
@@ -215,11 +240,19 @@ class UserHistory {
                 return { status: "error", message: "Order is deleted!" };
             }
 
-            // 2. Approve order
-            await connection.query(
-                `UPDATE deliver_orders SET is_approved = 1 WHERE order_id = ?`,
-                [id],
-            );
+            // 2. Approve order, stamped with the Beirut wall clock when the column exists
+            // (momentTz: plain `moment` has no .tz unless moment-timezone was loaded first)
+            if (withApprovedAt) {
+                await connection.query(
+                    `UPDATE deliver_orders SET is_approved = 1, approved_at = ? WHERE order_id = ?`,
+                    [momentTz.tz("Asia/Beirut").format("YYYY-MM-DD HH:mm:ss"), id],
+                );
+            } else {
+                await connection.query(
+                    `UPDATE deliver_orders SET is_approved = 1 WHERE order_id = ?`,
+                    [id],
+                );
+            }
 
             // 3. Fetch invoice items
             const [items] = await connection.query(

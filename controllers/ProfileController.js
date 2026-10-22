@@ -1,14 +1,23 @@
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 const User = require("../models/UserModel");
+const { ACCESS_SECRET } = require("../config/jwt");
 
 // ******************************************* Profile Methods ***********************************
 
-// update profile username
+// update profile username. The new token carries exactly the claims of
+// AuthController.login — user_id, database_id, username, user_type — read from the
+// login's row, so it works everywhere the login token did.
 exports.updateProfile = async (req, res, next) => {
     const { user_id } = req.user;
     let { new_username } = req.body;
     try {
+        // mysql2 expands an object bound to `?` (or in `SET ?`) into SQL, so only a
+        // non-empty string reaches the queries; the profile form always sends one
+        if (typeof new_username !== "string" || new_username === "") {
+            return res.status(400).send({ message: "Username is required" });
+        }
+
         let [validateUser] = await User.getByIdAndUsername(
             user_id,
             new_username
@@ -26,10 +35,10 @@ exports.updateProfile = async (req, res, next) => {
                 {
                     user_id: result.user_id.toString(),
                     database_id: result.database_id,
-                    new_username,
+                    username: new_username,
                     user_type: result.user_type,
                 },
-                "$3a#_cJDUV-$QsRewWXcyH-Xdji8#%^$*(_ZkfNdI@#!D-Nv0E_M3a"
+                ACCESS_SECRET
             );
             const updatedUser = {
                 username: new_username,

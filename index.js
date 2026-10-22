@@ -19,7 +19,8 @@ const io = socketIO(server, {
 
 const path = require("path");
 
-const { auth, admin } = require("./middleware/auth");
+const { auth, admin, owner } = require("./middleware/auth");
+const reportsAccess = require("./middleware/reportsAccess");
 const errorHandler = require("./middleware/errorHandler");
 
 //import routes
@@ -39,6 +40,7 @@ const PaymentRoutes = require("./routes/payment.routes");
 const BalanceRoutes = require("./routes/balance.routes");
 const ExpenseRoutes = require("./routes/expense.routes");
 const ReportRoutes = require("./routes/report.routes");
+const ReportsV2Routes = require("./routes/reports-v2.routes");
 const ReturnRoutes = require("./routes/return.routes");
 const PurchaseRoutes = require("./routes/purchase-orders.routes");
 
@@ -57,10 +59,18 @@ app.use("/payment", auth, PaymentRoutes);
 app.use("/balance", auth, BalanceRoutes);
 app.use("/expense", auth, ExpenseRoutes);
 app.use("/report", auth, ReportRoutes);
+// reports v2: the reports password gate (users and staff) runs after the login check
+app.use("/reports/v2", auth, reportsAccess, ReportsV2Routes);
 app.use("/return", auth, ReturnRoutes);
 app.use("/dispose", auth, require("./routes/dispose.routes"));
-app.use("/staff", auth, require("./routes/staff.routes"));
+// staff management: the account owner (admin or user) manages their own staff; staff
+// share the owner's database_id, so without `owner` they could edit their own
+// permissions, create logins or delete the owner
+app.use("/staff", auth, owner, require("./routes/staff.routes"));
 app.use("/transfer", auth, require("./routes/transfer.routes"));
+// partner shares taken (reports v2 Phase 7.1): users record, the admin approves; the
+// router refuses staff (`owner`) and re-reads the live login on every route
+app.use("/partner-shares", auth, require("./routes/partner-shares.routes"));
 app.use("/deliver", auth, DeliverRoutes);
 app.use("/quotations", auth, require("./routes/quotations.routes"));
 
@@ -86,9 +96,11 @@ app.use(errorHandler);
 
 const initBackupCron = require("./backup"); // Import cron module
 const initExportCron = require("./export-customers-balances"); // Import export cron module
+const initInventorySnapshotCron = require("./jobs/inventorySnapshot"); // Month-end stock snapshot
 
 initBackupCron(); // Initialize the backup cron job
 initExportCron(); // Initialize export cron job
+initInventorySnapshotCron(); // Month-end stock snapshot (not run at startup)
 
 // start server
 server.listen(process.env.PORT, () =>
