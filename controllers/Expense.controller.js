@@ -38,7 +38,10 @@ const MAX_CENTS = 9999999999;
 // admin's cash corrections with reasons (BalanceModel.CORRECTION_REASONS, 2026-10-22):
 // an expense must not pass for a capital entry, a drawing, an unknown loss or gain, or
 // money moved to or from the safe. 'Opening Safe Balance' labels the admin's one opening
-// entry of cash outside the till (BalanceModel.SAFE_OPENING, owner answer F2).
+// entry of cash outside the till (BalanceModel.SAFE_OPENING, owner answer F2). Since
+// 2026-10-23 (owner request: the safe is the "Vault") new vouchers are written as 'Moved
+// to Vault', 'Back from Vault' and 'Opening Vault Balance'; the three older labels stay
+// reserved, as vouchers written before still carry them.
 const RESERVED_DESCRIPTIONS = [
     "Payment Received",
     "Supplier Payment",
@@ -59,6 +62,9 @@ const RESERVED_DESCRIPTIONS = [
     "Moved to Safe",
     "Back from Safe",
     "Opening Safe Balance",
+    "Moved to Vault",
+    "Back from Vault",
+    "Opening Vault Balance",
 ];
 
 // Latin letters with a stroke or bar. NFKD keeps them whole, but Unicode collation

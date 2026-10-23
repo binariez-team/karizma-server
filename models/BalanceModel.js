@@ -45,6 +45,15 @@ const { toCents, toMoney } = require("./reports-v2/money");
 //   the till (531 / 532): not a correction row, not in the cash flow, but in the safe's
 //   balance (tillBalance, M36). While it exists, no correction dated before it can become
 //   a safe move (BEFORE_SAFE_OPENING), so it always stays the safe's first movement.
+// - "Vault" (owner request, 2026-10-23): the screens call 533 the Vault. Only the voucher
+//   descriptions written from then on changed ('Moved to Vault', 'Back from Vault',
+//   'Opening Vault Balance'); vouchers written before keep 'Moved to Safe', 'Back from
+//   Safe' and 'Opening Safe Balance' (an edit or a reclassify rewrites the label), and
+//   Expense.controller reserves both sets. Nothing classifies by these descriptions: the
+//   number (SFO / SFI / SOB + id) does, so the prefixes, the reason keys (to_safe,
+//   from_safe, safe_opening), the routes and the answers' keys are unchanged.
+// - GET /balance gives the admin his vault (vault_balance: vaultBalance below, the same
+//   Σ as tillBalance's outside_till); every other login gets null.
 // - Statements carry /* rk:corrections.* */ markers (logs, tests). Chart ids are read on
 //   the transaction's own connection (a second pool connection inside a transaction can
 //   deadlock the pool, TransferModel.getMoneyAccountId).
@@ -54,8 +63,9 @@ const CORRECTION_REASONS = Object.freeze({
     owner_drawings: Object.freeze({ prefix: "DRW", account: "1081", direction: "out", label: "Owner Drawings" }),
     unknown_loss: Object.freeze({ prefix: "CLS", account: "658", direction: "out", label: "Unknown Cash Loss" }),
     unknown_gain: Object.freeze({ prefix: "CGN", account: "758", direction: "in", label: "Unknown Cash Gain" }),
-    to_safe: Object.freeze({ prefix: "SFO", account: "533", direction: "out", label: "Moved to Safe" }),
-    from_safe: Object.freeze({ prefix: "SFI", account: "533", direction: "in", label: "Back from Safe" }),
+    // labels before 2026-10-23: 'Moved to Safe', 'Back from Safe' (still reserved)
+    to_safe: Object.freeze({ prefix: "SFO", account: "533", direction: "out", label: "Moved to Vault" }),
+    from_safe: Object.freeze({ prefix: "SFI", account: "533", direction: "in", label: "Back from Vault" }),
 });
 const LEGACY_NUMBER = "Manual Transaction";
 const LEGACY_ACCOUNT = "101";
@@ -71,7 +81,7 @@ const SAFE_OPENING = Object.freeze({
     prefix: "SOB",
     account: "533", // Dr: cash outside the till
     counter: "101", // Cr: capital
-    label: "Opening Safe Balance",
+    label: "Opening Vault Balance", // 'Opening Safe Balance' before 2026-10-23 (still reserved)
 });
 // The reasons that move the safe (533): never dated before the opening safe balance
 const SAFE_REASONS = Object.keys(CORRECTION_REASONS).filter(
@@ -448,6 +458,20 @@ class BalanceModel {
             negative_till: cash < 0 || whish < 0,
             negative_outside_till: outside < 0,
         };
+    }
+
+    /**
+     * The admin's vault for GET /balance (owner request, 2026-10-23): the balance of 533
+     * on `database_id`, as a 2-decimal string (signed), or null while the chart has no
+     * 533 (§7.8 not run). tillBalance's outside_till itself, so it is the figure of the
+     * corrections list and of the correction answers (and M36's rule: Σ(debit − credit)
+     * of the tenant's live 533 lines). The caller passes the admin's own tenant only.
+     */
+    static async vaultBalance(database_id) {
+        const chart = await correctionChart(pool);
+        if (chart.id(SAFE_OPENING.account) === null) return null;
+        const { balance } = await BalanceModel.tillBalance(pool, chart, database_id);
+        return balance.outside_till;
     }
 
     /**

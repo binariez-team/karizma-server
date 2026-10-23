@@ -8,12 +8,31 @@ const validate = require("../models/reports-v2/validate");
 // the Expense labels check (the same list and folding): a legacy note becomes a description
 const { reservedLabelOf } = require("./Expense.controller");
 
-//get user balance
+/**
+ * GET /balance's vault_balance (owner request, 2026-10-23): the admin's vault (533, cash
+ * out of the till) on his own tenant, a 2-decimal string; null for any other login and
+ * while the chart has no 533 (§7.8 not run). The token's user_type only picks who is
+ * looked at: the live users row must still be that admin's (access.loadViewer, as the
+ * correction routes), else null, never a refusal: the till figures stay as they were.
+ */
+async function vaultBalanceOf(req) {
+    if (req.user?.user_type !== "admin") return null;
+    let viewer;
+    try {
+        viewer = await access.loadViewer(req);
+    } catch (error) {
+        if (error instanceof ReportError) return null;
+        throw error;
+    }
+    return viewer.isAdmin ? Balance.vaultBalance(viewer.databaseId) : null;
+}
+
+//get user balance (+ vault_balance: additive, older builds ignore it)
 exports.getBalance = async (req, res, next) => {
     try {
         const { database_id } = req.user;
         const balance = await Balance.getBalance(database_id);
-        res.status(200).send(balance);
+        res.status(200).send({ ...balance, vault_balance: await vaultBalanceOf(req) });
     } catch (error) {
         next(error);
     }
@@ -101,6 +120,9 @@ exports.selfTransfer = async (req, res, next) => {
 // /balance/corrections/audit); the admin's one opening safe balance has its own routes
 // (F2, /balance/safe-opening); a legacy note (old builds, or an edit keeping an old
 // correction) may not be a reserved voucher label (F3).
+//
+// "Vault" (owner request, 2026-10-23): the messages below call 533 the vault; the codes,
+// fields, reason keys, routes and answer keys (outside_till, safe_opening) are unchanged.
 
 const CORRECTION_NOT_FOUND = { message: "Correction not found." };
 const NOT_SET_UP = {
@@ -236,7 +258,7 @@ function parseDay(value, field) {
 /** The opening safe balance's day (F2): required, valid, never after `today` (Beirut). */
 function parseOpeningDay(value, today) {
     const day = parseDay(value, "date");
-    if (day === null) throw badRequest("date", "Pick the day this balance was in the safe.");
+    if (day === null) throw badRequest("date", "Pick the day this balance was in the vault.");
     if (day > today) throw badRequest("date", "Pick a day that is not in the future.");
     return day;
 }
@@ -288,20 +310,20 @@ function sendOutcome(res, result) {
         case Balance.SAFE_OPENING_EXISTS:
             return res.status(409).json({
                 code: "SAFE_OPENING_EXISTS",
-                message: `There is already an opening safe balance (${result.journal_number}): edit or delete it instead.`,
+                message: `There is already an opening vault balance (${result.journal_number}): edit or delete it instead.`,
                 journal_id: result.journal_id,
             });
         case Balance.OPENING_AFTER_FIRST_MOVE:
             return res.status(400).json({
                 code: "BAD_REQUEST",
                 field: "date",
-                message: `Pick a day on or before ${result.max_date}, the first movement of cash outside the till.`,
+                message: `Pick a day on or before ${result.max_date}, the first movement of the vault.`,
                 max_date: result.max_date,
             });
         case Balance.BEFORE_SAFE_OPENING:
             return res.status(409).json({
                 code: "BEFORE_SAFE_OPENING",
-                message: `${result.ids.length} of the selected corrections ${result.ids.length === 1 ? "is" : "are"} dated before the opening safe balance (${result.opening_date}): date the opening on or before ${result.earliest} first.`,
+                message: `${result.ids.length} of the selected corrections ${result.ids.length === 1 ? "is" : "are"} dated before the opening vault balance (${result.opening_date}): date the opening on or before ${result.earliest} first.`,
                 ids: result.ids,
                 opening_date: result.opening_date,
             });
@@ -577,7 +599,7 @@ exports.createSafeOpening = async (req, res, next) => {
             actorOf(req, at),
         );
         if (result.status !== Balance.OK) return sendOutcome(res, result);
-        return res.status(201).json(openingAnswer("Opening safe balance saved.", result));
+        return res.status(201).json(openingAnswer("Opening vault balance saved.", result));
     } catch (error) {
         return fail(error, res, next);
     }
@@ -597,7 +619,7 @@ exports.updateSafeOpening = async (req, res, next) => {
             actorOf(req, at),
         );
         if (result.status !== Balance.OK) return sendOutcome(res, result);
-        return res.status(200).json(openingAnswer("Opening safe balance updated.", result));
+        return res.status(200).json(openingAnswer("Opening vault balance updated.", result));
     } catch (error) {
         return fail(error, res, next);
     }
@@ -614,7 +636,7 @@ exports.deleteSafeOpening = async (req, res, next) => {
             actorOf(req, nowString()),
         );
         if (result.status !== Balance.OK) return sendOutcome(res, result);
-        return res.status(200).json(openingAnswer("Opening safe balance deleted.", result));
+        return res.status(200).json(openingAnswer("Opening vault balance deleted.", result));
     } catch (error) {
         return fail(error, res, next);
     }

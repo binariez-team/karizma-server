@@ -98,8 +98,14 @@ const initBackupCron = require("./backup"); // Import cron module
 const initExportCron = require("./export-customers-balances"); // Import export cron module
 const initInventorySnapshotCron = require("./jobs/inventorySnapshot"); // Month-end stock snapshot
 
-initBackupCron(); // Initialize the backup cron job
-initExportCron(); // Initialize export cron job
+// Backups and the balances export upload to Google Drive and prune old files there, so
+// only production runs them (NODE_ENV=production in the server's .env); never locally.
+if (process.env.NODE_ENV === "production") {
+    initBackupCron(); // Initialize the backup cron job
+    initExportCron(); // Initialize export cron job
+} else {
+    console.log("⏸ Backup and export crons are off (NODE_ENV is not production)");
+}
 initInventorySnapshotCron(); // Month-end stock snapshot (not run at startup)
 
 // start server
